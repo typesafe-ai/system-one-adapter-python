@@ -1,0 +1,23 @@
+[project]
+name = "opentypesafe2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Erik Gafni", email = "erik@typesafe.ai" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "anthropic>=0.121.0",
+    "openai>=2.53.0",
+    "pydantic-ai>=2.27.0",
+    "typesafe-client>=1.0.0",
+]
+
+[[tool.uv.index]]
+name = "typesafe"
+url = "https://pypi.typesafe.ai/"
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
