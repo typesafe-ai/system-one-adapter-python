@@ -43,7 +43,8 @@ def model_response(response_data, expected_output_mode, expected_descriptions=()
     def return_configured_model_response(messages, agent_info):
         parameters = agent_info.model_request_parameters
         assert parameters.output_mode == expected_output_mode
-        if prompted_output_instructions := parameters.prompted_output_instructions:
+        prompted_output_instructions = parameters.prompted_output_instructions
+        if prompted_output_instructions:
             assert (
                 sum(
                     instruction_part.content == prompted_output_instructions
