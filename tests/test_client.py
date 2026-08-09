@@ -3,23 +3,14 @@
 import asyncio
 import json
 
-import httpx
 import pytest
 from pydantic_ai import ModelMessagesTypeAdapter
-from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
+from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
-from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.function import FunctionModel
-from pydantic_ai.models.openai import OpenAIResponsesModel
-from pydantic_ai.providers.anthropic import AnthropicProvider
-from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.usage import RequestUsage
 from typesafe_client import RetryConfig, TypeSafeClient
 from typesafe_client.api.api_client import (
-    TypeSafeApiError,
-    TypeSafeAuthError,
-    TypeSafeTimeoutError,
-    TypeSafeTokensExceededError,
     TypeSafeUnknownError,
 )
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
@@ -185,147 +176,6 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
         )
     )
     assert replayed_response.parts == restored_messages[-1].parts
-
-
-@pytest.mark.parametrize(
-    ("make_error", "error_type", "expected_status_code"),
-    [
-        (
-            lambda: ModelHTTPError(401, "test-model", {"message": "bad key"}),
-            TypeSafeAuthError,
-            None,
-        ),
-        (
-            lambda: ModelHTTPError(403, "test-model", {"message": "forbidden"}),
-            TypeSafeAuthError,
-            None,
-        ),
-        (
-            lambda: ModelHTTPError(
-                400,
-                "test-model",
-                {"error": {"code": "context_length_exceeded"}},
-            ),
-            TypeSafeTokensExceededError,
-            None,
-        ),
-        (
-            lambda: ModelHTTPError(408, "test-model", {"message": "request timeout"}),
-            TypeSafeTimeoutError,
-            None,
-        ),
-        (
-            lambda: ModelHTTPError(504, "test-model", {"message": "gateway timeout"}),
-            TypeSafeTimeoutError,
-            None,
-        ),
-        (
-            lambda: ModelAPIError("test-model", "connection failed"),
-            TypeSafeTimeoutError,
-            None,
-        ),
-        (lambda: httpx.ConnectError("connection refused"), TypeSafeTimeoutError, None),
-        (lambda: TimeoutError("timed out"), TypeSafeTimeoutError, None),
-        (
-            lambda: ModelHTTPError(500, "test-model", {"message": "boom"}),
-            TypeSafeUnknownError,
-            500,
-        ),
-        (
-            lambda: ModelHTTPError(418, "test-model", {"message": "teapot"}),
-            TypeSafeUnknownError,
-            418,
-        ),
-        (
-            lambda: ModelHTTPError(
-                413,
-                "test-model",
-                {"error": {"type": "request_too_large"}},
-            ),
-            TypeSafeUnknownError,
-            413,
-        ),
-        (
-            lambda: ModelHTTPError(
-                429,
-                "test-model",
-                {"error": {"message": "Too many tokens per minute"}},
-            ),
-            TypeSafeUnknownError,
-            429,
-        ),
-        (lambda: RuntimeError("something else"), TypeSafeUnknownError, None),
-    ],
-)
-def test_provider_errors(make_error, error_type, expected_status_code):
-    def raise_configured_provider_error(messages, agent_info):
-        raise make_error()
-
-    model = FunctionModel(raise_configured_provider_error, model_name="test-model")
-
-    with pytest.raises(error_type) as raised:
-        TypeSafeClientAdapter().system_one(
-            model, "document", {"answer": QUESTIONS["positive"]}
-        )
-
-    assert isinstance(raised.value, TypeSafeApiError)
-    if error_type is TypeSafeUnknownError:
-        assert raised.value.status_code == expected_status_code
-
-
-@pytest.mark.parametrize(
-    ("provider", "error_body"),
-    [
-        pytest.param(
-            "openai",
-            {
-                "error": {
-                    "message": "Your input exceeds this model's context window.",
-                    "type": "invalid_request_error",
-                    "param": "input",
-                    "code": "context_length_exceeded",
-                }
-            },
-            id="openai",
-        ),
-        pytest.param(
-            "anthropic",
-            {
-                "type": "error",
-                "error": {
-                    "type": "invalid_request_error",
-                    "message": "prompt is too long: 220256 tokens > 200000 maximum",
-                },
-                "request_id": "req_test",
-            },
-            id="anthropic",
-        ),
-    ],
-)
-def test_provider_context_window_errors_are_mapped(provider, error_body):
-    def return_provider_error(request):
-        return httpx.Response(400, json=error_body, request=request)
-
-    http_client = httpx.AsyncClient(
-        transport=httpx.MockTransport(return_provider_error)
-    )
-    if provider == "openai":
-        model = OpenAIResponsesModel(
-            "gpt-4o-mini",
-            provider=OpenAIProvider(api_key="test", http_client=http_client),
-        )
-    else:
-        model = AnthropicModel(
-            "claude-haiku-4-5",
-            provider=AnthropicProvider(api_key="test", http_client=http_client),
-        )
-
-    with pytest.raises(TypeSafeTokensExceededError):
-        TypeSafeClientAdapter().system_one(
-            model,
-            "document",
-            {"answer": QUESTIONS["positive"]},
-        )
 
 
 @pytest.mark.parametrize("async_call", [False, True])

@@ -18,6 +18,22 @@ from typesafe_client.api.api_client import (
 
 ResultT = TypeVar("ResultT")
 
+# Provider error codes and message fragments signalling the input exceeded the
+# model's context window. Providers disagree on shape, so both are checked.
+CONTEXT_WINDOW_ERROR_CODES = frozenset(
+    {"context_length_exceeded", "request_too_large", "string_above_max_length"}
+)
+CONTEXT_WINDOW_MESSAGE_MARKERS = (
+    "context window",
+    "maximum context",
+    "context_length_exceeded",
+    "context limit",
+    "prompt is too long",
+    "request too large",
+    "request_too_large",
+    "too many tokens",
+)
+
 
 def run_with_retries(
     function: Callable[[], ResultT],
@@ -70,6 +86,7 @@ async def run_with_retries_async(
 
     raise AssertionError("retry loop did not return or raise")
 
+
 def _map_provider_exception_to_typesafe_api_error(
     error: Exception,
 ) -> TypeSafeApiError:
@@ -86,14 +103,21 @@ def _map_provider_exception_to_typesafe_api_error(
     if is_connection_error or status_code in (408, 504):
         return TypeSafeTimeoutError(detail)
 
+    # ``body`` is only a dict when the provider returned parseable JSON; it can also
+    # be raw text or None, so fall back to scanning the stringified error.
     body = error.body if isinstance(error, ModelHTTPError) else None
-    provider_error = body.get("error", body) if isinstance(body, dict) else {}
-    context_window_exceeded = isinstance(provider_error, dict) and (
-        provider_error.get("code") == "context_length_exceeded"
-        or str(provider_error.get("message", "")).lower().startswith(
-            "prompt is too long"
-        )
+    provider_error = body.get("error", body) if isinstance(body, dict) else None
+    # Providers put the machine-readable code under "code" (OpenAI) or "type"
+    # (Anthropic); either may be absent, hence the message-marker fallback.
+    error_codes = (
+        {provider_error.get("code"), provider_error.get("type")}
+        if isinstance(provider_error, dict)
+        else set()
     )
-    if status_code == 400 and context_window_exceeded:
+    error_text = str(error).lower()
+    context_window_exceeded = bool(error_codes & CONTEXT_WINDOW_ERROR_CODES) or any(
+        marker in error_text for marker in CONTEXT_WINDOW_MESSAGE_MARKERS
+    )
+    if status_code in (400, 413) and context_window_exceeded:
         return TypeSafeTokensExceededError(detail)
     return TypeSafeUnknownError(detail, status_code)

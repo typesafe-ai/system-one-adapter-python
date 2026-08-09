@@ -16,7 +16,6 @@ from typesafe_client.api.models import (
 )
 
 # TypeSafeClientAdapter has the same system_one interface as TypeSafeClient.
-# Its constructor selects structured-output and answer modes.
 typesafe_client_adapter = TypeSafeClientAdapter()
 typesafe_client = TypeSafeClient()
 
