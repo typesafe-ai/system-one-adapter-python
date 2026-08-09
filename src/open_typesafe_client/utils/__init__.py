@@ -1,1 +1,0 @@
-"""Internal OpenTypeSafe utilities."""

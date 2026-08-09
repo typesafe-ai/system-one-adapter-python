@@ -1,5 +1,5 @@
 [project]
-name = "open-typesafe-client"
+name = "typesafe-client-adapter"
 version = "0.1.0"
 description = "Drop-in TypeSafeClient replacement backed by LLM APIs via PydanticAI"
 readme = "README.md"
@@ -26,7 +26,7 @@ name = "typesafe"
 url = "https://pypi.typesafe.ai/"
 
 [tool.uv.build-backend]
-module-name = "open_typesafe_client"
+module-name = "typesafe_client_adapter"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
