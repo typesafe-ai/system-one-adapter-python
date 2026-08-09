@@ -7,7 +7,7 @@ this client builds and the response it parses are both exercised for real.
 
 Cassettes live in ``tests/cassettes`` and are replayed by default, so the whole client
 stack runs against recorded provider traffic without credentials or network access.
-Complete normalized responses live in ``tests/expected_responses.json``. Only volatile
+Complete normalized responses live in ``tests/expected_responses``. Only volatile
 debug timestamps, run IDs, and conversation IDs use ``<dynamic>`` placeholders.
 Re-record after changing prompts, schemas, or providers::
 
@@ -115,8 +115,9 @@ def test_live_responses_match_reference_shape(
     if latency is not None:
         assert 0 < latency < 120
 
-    expected_responses_path = Path(__file__).with_name("expected_responses.json")
-    expected_response_data = json.loads(expected_responses_path.read_text())[
-        request.node.callspec.id
-    ]
+    expected_response_path = (
+        Path(__file__).with_name("expected_responses")
+        / f"{request.node.callspec.id}.json"
+    )
+    expected_response_data = json.loads(expected_response_path.read_text())
     assert normalized_response_data == expected_response_data

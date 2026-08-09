@@ -1,0 +1,258 @@
+{
+  "model": "gpt-4o-mini",
+  "answers": {
+    "positive": {
+      "type": "noul",
+      "noul": 1
+    },
+    "stars": {
+      "type": "score",
+      "score": 4,
+      "confidence": 1,
+      "probabilities": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 1
+      }
+    },
+    "genre": {
+      "type": "choice",
+      "choice": "fiction",
+      "confidence": 1,
+      "probabilities": {
+        "fiction": 1,
+        "nonfiction": 0
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 621,
+    "output_tokens": 42,
+    "n_retries": 0,
+    "n_retries_malformed_structure": 0
+  },
+  "debug": {
+    "max_error": 0,
+    "invalid_probs": 0,
+    "probability_errors": {},
+    "llm_queries": [
+      {
+        "llm_query": {
+          "messages": [
+            {
+              "parts": [
+                {
+                  "content": "Document:\n\"This book was a delight to read.\"",
+                  "timestamp": "<dynamic>",
+                  "part_kind": "user-prompt"
+                }
+              ],
+              "timestamp": "<dynamic>",
+              "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.\nDo not add facts which are not supported by the document.",
+              "kind": "request",
+              "run_id": "<dynamic>",
+              "conversation_id": "<dynamic>",
+              "metadata": null,
+              "state": "complete"
+            }
+          ],
+          "model_settings": null,
+          "model_request_parameters": {
+            "function_tools": [],
+            "native_tools": [],
+            "tool_visibility": {},
+            "revealed_tool_names": [],
+            "output_mode": "prompted",
+            "output_object": {
+              "json_schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "answers": {
+                    "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/TypeSafeAnswers"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "answers"
+                ],
+                "type": "object",
+                "$defs": {
+                  "ChoiceProbabilities2": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "fiction": {
+                        "description": "A novel or short story.",
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "nonfiction": {
+                        "description": "A book based on facts, real events, or ideas.",
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "fiction",
+                      "nonfiction"
+                    ],
+                    "type": "object"
+                  },
+                  "ScoreProbabilities1": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "0": {
+                        "description": "Horrendous. Unreadable garbage.",
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "1": {
+                        "description": "Pretty bad, but theoretically readable.",
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "2": {
+                        "description": "Acceptable, but just barely.",
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "3": {
+                        "description": "Pretty good. Worth reading but not perfect.",
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "4": {
+                        "description": "Transcendent and impactful. A must read.",
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "0",
+                      "1",
+                      "2",
+                      "3",
+                      "4"
+                    ],
+                    "type": "object"
+                  },
+                  "TypeSafeAnswers": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "positive": {
+                        "description": "The book review is positive.",
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "stars": {
+                        "description": "Star rating for the book based on the review.",
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/ScoreProbabilities1"
+                          }
+                        ]
+                      },
+                      "genre": {
+                        "description": "Which genre this review is about.",
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/ChoiceProbabilities2"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "positive",
+                      "stars",
+                      "genre"
+                    ],
+                    "type": "object"
+                  }
+                }
+              },
+              "name": "TypeSafeEvaluation",
+              "description": null,
+              "strict": true
+            },
+            "output_tools": [],
+            "prompted_output_template": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{schema}\n\nDon't include any text or Markdown fencing before or after.\n",
+            "allow_text_output": true,
+            "allow_image_output": false,
+            "instruction_parts": [
+              {
+                "content": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.\nDo not add facts which are not supported by the document.",
+                "dynamic": false,
+                "part_kind": "instruction"
+              },
+              {
+                "content": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{\"additionalProperties\": false, \"properties\": {\"answers\": {\"description\": \"Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.\", \"anyOf\": [{\"$ref\": \"#/$defs/TypeSafeAnswers\"}]}}, \"required\": [\"answers\"], \"type\": \"object\", \"$defs\": {\"ChoiceProbabilities2\": {\"additionalProperties\": false, \"properties\": {\"fiction\": {\"description\": \"A novel or short story.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"nonfiction\": {\"description\": \"A book based on facts, real events, or ideas.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}}, \"required\": [\"fiction\", \"nonfiction\"], \"type\": \"object\"}, \"ScoreProbabilities1\": {\"additionalProperties\": false, \"properties\": {\"0\": {\"description\": \"Horrendous. Unreadable garbage.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"1\": {\"description\": \"Pretty bad, but theoretically readable.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"2\": {\"description\": \"Acceptable, but just barely.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"3\": {\"description\": \"Pretty good. Worth reading but not perfect.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"4\": {\"description\": \"Transcendent and impactful. A must read.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}}, \"required\": [\"0\", \"1\", \"2\", \"3\", \"4\"], \"type\": \"object\"}, \"TypeSafeAnswers\": {\"additionalProperties\": false, \"properties\": {\"positive\": {\"description\": \"The book review is positive.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"stars\": {\"description\": \"Star rating for the book based on the review.\", \"anyOf\": [{\"$ref\": \"#/$defs/ScoreProbabilities1\"}]}, \"genre\": {\"description\": \"Which genre this review is about.\", \"anyOf\": [{\"$ref\": \"#/$defs/ChoiceProbabilities2\"}]}}, \"required\": [\"positive\", \"stars\", \"genre\"], \"type\": \"object\"}}, \"title\": \"TypeSafeEvaluation\"}\n\nDon't include any text or Markdown fencing before or after.\n",
+                "dynamic": false,
+                "part_kind": "instruction"
+              }
+            ],
+            "thinking": null
+          }
+        },
+        "llm_response": {
+          "parts": [
+            {
+              "content": "{\"answers\":{\"positive\":1,\"stars\":{\"0\":0,\"1\":0,\"2\":0,\"3\":0,\"4\":1},\"genre\":{\"fiction\":1,\"nonfiction\":0}}}",
+              "id": "msg_0a1823890936afc8006a77d40894e0819999a41a53a424aa2b",
+              "provider_name": "openai",
+              "provider_details": null,
+              "part_kind": "text"
+            }
+          ],
+          "usage": {
+            "input_tokens": 621,
+            "cache_write_tokens": 0,
+            "cache_read_tokens": 0,
+            "output_tokens": 42,
+            "input_audio_tokens": 0,
+            "cache_audio_read_tokens": 0,
+            "output_audio_tokens": 0,
+            "details": {
+              "reasoning_tokens": 0
+            },
+            "cost": null,
+            "output_reasoning_tokens": 0
+          },
+          "model_name": "gpt-4o-mini-2024-07-18",
+          "timestamp": "<dynamic>",
+          "kind": "response",
+          "provider_name": "openai",
+          "provider_url": "https://api.openai.com/v1/",
+          "provider_details": {
+            "finish_reason": "completed",
+            "timestamp": "<dynamic>"
+          },
+          "provider_response_id": "resp_0a1823890936afc8006a77d408109c81998fae2f20faf926b8",
+          "finish_reason": "stop",
+          "run_id": null,
+          "conversation_id": null,
+          "metadata": null,
+          "state": "complete"
+        },
+        "debug_info": {
+          "model_name": "gpt-4o-mini",
+          "model_id": "openai:gpt-4o-mini",
+          "provider": "openai",
+          "base_url": "https://api.openai.com/v1/"
+        }
+      }
+    ]
+  }
+}
