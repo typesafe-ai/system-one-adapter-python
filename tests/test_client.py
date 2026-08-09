@@ -44,7 +44,8 @@ def model_response(response_data, expected_output_mode, expected_descriptions=()
         parameters = agent_info.model_request_parameters
         assert parameters.output_mode == expected_output_mode
         prompted_output_instructions = parameters.prompted_output_instructions
-        if prompted_output_instructions:
+        if expected_output_mode == "prompted":
+            assert prompted_output_instructions
             assert (
                 sum(
                     instruction_part.content == prompted_output_instructions
@@ -52,6 +53,8 @@ def model_response(response_data, expected_output_mode, expected_descriptions=()
                 )
                 == 1
             )
+        else:
+            assert prompted_output_instructions is None
         output_schema = parameters.output_object.json_schema
         for expected_description in expected_descriptions:
             assert expected_description in json.dumps(output_schema)
