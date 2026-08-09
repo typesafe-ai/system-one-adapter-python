@@ -135,21 +135,46 @@ LLM response:
     "probability_errors": {},
     "llm_queries": [
       {
-        "model": "gpt-4o-mini",
-        "input": ["Final provider HTTP request messages"],
-        "text": {"format": {"type": "json_object"}}
-      }
-    ],
-    "llm_responses": [
-      {"id": "response-id", "output": []}
-    ],
-    "debug_info": [
-      {
-        "model_name": "gpt-4o-mini",
-        "provider": "openai",
-        "method": "POST",
-        "url": "https://api.openai.com/v1/responses",
-        "status_code": 200
+        "messages": [
+          {
+            "parts": [
+              {
+                "content": "Document:\n\"This book was a delight to read.\"",
+                "part_kind": "user-prompt"
+              }
+            ],
+            "instructions": "Evaluate every question using only the supplied document.",
+            "kind": "request",
+            "metadata": null,
+            "state": "complete"
+          }
+        ],
+        "model_settings": {},
+        "model_request_parameters": {
+          "function_tools": [],
+          "output_mode": "native",
+          "output_object": {
+            "json_schema": {"type": "object", "properties": {"answers": {}}}
+          }
+        },
+        "llm_response": {
+          "parts": [
+            {
+              "content": "{\"answers\": {...}}",
+              "part_kind": "text"
+            }
+          ],
+          "model_name": "gpt-4o-mini-2024-07-18",
+          "kind": "response",
+          "provider_name": "openai",
+          "finish_reason": "stop",
+          "state": "complete"
+        },
+        "debug_info": {
+          "model_name": "gpt-4o-mini-2024-07-18",
+          "provider": "openai",
+          "finish_reason": "stop"
+        }
       }
     ]
   }
@@ -174,9 +199,15 @@ LLM response:
   - `invalid_probs` counts answers whose probability error exceeds `1e-6`
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
-  - `llm_queries` contains the final JSON HTTP request body for each provider attempt
-  - `llm_responses` contains the matching raw JSON HTTP response body, or `null` when no response arrived
-  - `debug_info` contains matching provider, endpoint, status, and error metadata
+  - `llm_queries` contains one dictionary per PydanticAI model attempt
+    - each dictionary contains serialized messages, prepared model settings, and prepared `ModelRequestParameters`
+    - request parameters preserve function tools, output tools, output mode, and the structured-output schema needed to reconstruct the call
+    - `llm_response` contains the matching serialized PydanticAI `ModelResponse`, or `null` when no response arrived
+    - `debug_info` contains model, provider, finish-reason, and error metadata for that attempt
+  - the messages and response round-trip through PydanticAI's `ModelMessagesTypeAdapter`
+  - a public PydanticAI `model_request` hook captures the logical request immediately before the model call
+  - these fields describe the provider-independent PydanticAI request, not the provider's final HTTP body
+  - serialized messages retain timestamps, run IDs, and conversation IDs for complete debugging context
 - Probability normalization
   - `normalize_probabilities=False` preserves LLM probabilities and only reports errors
   - `normalize_probabilities=True` renormalizes score and choice distributions

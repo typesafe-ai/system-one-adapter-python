@@ -5,37 +5,43 @@ from collections.abc import Mapping
 from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
-from pydantic_ai import Agent, NativeOutput, PromptedOutput
-from pydantic_ai.models import Model
-from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
+from typesafe_client.api.models import (
+    ChoiceQuestion,
+    NoulQuestion,
+    Question,
+    ScoreQuestion,
+)
 from typesafe_client.values import QuestionCollectionType, question_to_api_model
 
 from typesafe_client_adapter.utils.probability_normalization import AnswerMode
-from typesafe_client_adapter.utils.provider_debug import ProviderDebugModel
 
 Probability: TypeAlias = Annotated[float, Field(ge=0, le=1)]
-Question: TypeAlias = NoulQuestion | ScoreQuestion | ChoiceQuestion
 
 
-def prepare_questions(questions: QuestionCollectionType) -> dict[str, Question]:
-    """Convert and validate TypeSafe questions.
+def convert_question_collection_to_validated_api_question_models(
+    questions: QuestionCollectionType,
+) -> dict[str, Question]:
+    """Convert a question collection to validated API question models.
+
+    Reject empty collections, convert dictionary questions to API model instances,
+    and require score and choice questions to define at least one criterion.
 
     :param questions: TypeSafe question collection.
     :return: Questions using API model types.
     """
     if not questions:
         raise ValueError("At least one question is required.")
-    prepared_questions = {
-        key: question_to_api_model(question) for key, question in questions.items()
-    }
-    for question in prepared_questions.values():
+    prepared_questions = {}
+    for key, question in questions.items():
+        prepared_question = question_to_api_model(question)
         if (
-            isinstance(question, (ScoreQuestion, ChoiceQuestion))
-            and not question.criteria
+            isinstance(prepared_question, (ScoreQuestion, ChoiceQuestion))
+            and not prepared_question.criteria
         ):
             raise ValueError(
                 "Score and choice questions require at least one criterion."
             )
+        prepared_questions[key] = prepared_question
     return prepared_questions
 
 
@@ -87,44 +93,6 @@ def create_llm_output_model(
             ),
         ),
     )
-
-
-def create_pydantic_ai_agent(
-    model: str | Model,
-    output_model: type[BaseModel],
-    structured_outputs: bool,
-    n_retry_malformed_structure: int,
-    instructions: str,
-) -> tuple[Agent, ProviderDebugModel]:
-    """Create the configured PydanticAI agent.
-
-    :param model: PydanticAI model or model name.
-    :param output_model: Pydantic output model.
-    :param structured_outputs: Whether to use native structured output.
-    :param n_retry_malformed_structure: Output validation retry count.
-    :param instructions: Agent system instructions.
-    :return: Configured agent and its provider debug wrapper.
-    """
-    requested_output: Any = (
-        NativeOutput(output_model)
-        if structured_outputs
-        else PromptedOutput(output_model)
-    )
-    provider_debug_model = ProviderDebugModel(
-        _resolve_provider_prefixed_pydantic_ai_model(model)
-    )
-    pydantic_agent = Agent(
-        provider_debug_model,
-        output_type=requested_output,
-        instructions=instructions,
-        retries={"output": n_retry_malformed_structure},
-    )
-    return pydantic_agent, provider_debug_model
-
-
-def get_model_name(model: str | Model) -> str:
-    """Return a string model name."""
-    return model if isinstance(model, str) else model.model_name
 
 
 def _create_llm_answer_type_for_question(
@@ -217,13 +185,3 @@ def _serialize_instruction_value_for_prompt(value: Any) -> str:
     if isinstance(value, str):
         return value
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
-
-
-def _resolve_provider_prefixed_pydantic_ai_model(model: str | Model) -> str | Model:
-    if not isinstance(model, str) or ":" in model:
-        return model
-    if model.startswith(("gpt-", "chatgpt-", "o1", "o3", "o4")):
-        return f"openai:{model}"
-    if model.startswith("claude-"):
-        return f"anthropic:{model}"
-    return model

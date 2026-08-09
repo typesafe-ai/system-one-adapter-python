@@ -7,7 +7,7 @@ this client builds and the response it parses are both exercised for real.
 
 Cassettes live in ``tests/cassettes`` and are replayed by default, so the whole client
 stack runs against recorded provider traffic without credentials or network access.
-Complete responses, including provider HTTP bodies, live in
+Complete responses, including serialized PydanticAI request contexts, live in
 ``tests/expected_responses``.
 Re-record after changing prompts, schemas, or providers::
 
@@ -22,6 +22,7 @@ import os
 from pathlib import Path
 
 import pytest
+from pydantic_ai import ModelMessagesTypeAdapter
 from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
@@ -48,6 +49,24 @@ QUESTIONS = {
         },
     ),
 }
+
+
+def _remove_generated_message_metadata(value):
+    """Remove PydanticAI values generated independently on every replay.
+
+    :param value: Nested response value.
+    :return: Copy without timestamps, run IDs, or conversation IDs.
+    """
+    if isinstance(value, dict):
+        return {
+            key: _remove_generated_message_metadata(item)
+            for key, item in value.items()
+            if key not in {"timestamp", "run_id", "conversation_id"}
+        }
+    if isinstance(value, list):
+        return [_remove_generated_message_metadata(item) for item in value]
+    return value
+
 
 @pytest.mark.vcr
 @pytest.mark.parametrize(
@@ -99,8 +118,15 @@ def test_live_responses_match_reference_shape(
         / f"{request.node.callspec.id}.json"
     )
     expected_response_data = json.loads(expected_response_path.read_text())
-    assert response_data == expected_response_data
-    assert json.dumps(response_data, sort_keys=True) == json.dumps(
-        expected_response_data,
-        sort_keys=True,
-    )
+    assert _remove_generated_message_metadata(
+        response_data
+    ) == _remove_generated_message_metadata(expected_response_data)
+    if isinstance(client, TypeSafeClientAdapter):
+        for llm_query in response_data["debug"]["llm_queries"]:
+            llm_response = llm_query["llm_response"]
+            ModelMessagesTypeAdapter.validate_python(
+                [
+                    *llm_query["messages"],
+                    *([llm_response] if llm_response is not None else []),
+                ]
+            )

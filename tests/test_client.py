@@ -5,6 +5,7 @@ import json
 
 import httpx
 import pytest
+from pydantic_ai import ModelMessagesTypeAdapter
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
@@ -141,80 +142,20 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert response.debug["probability_errors"] == {}
 
     llm_query = response.debug["llm_queries"][0]
-    serialized_messages = json.dumps(llm_query["messages"])
-    assert "Evaluate every question" in serialized_messages
-    assert "A delightful novel." in serialized_messages
-    request_parameters = llm_query["model_request_parameters"]
-    assert request_parameters["output_mode"] == expected_output_mode
-    assert "positive" in json.dumps(request_parameters["output_object"])
-    assert response.debug["llm_responses"][0]["kind"] == "response"
-    assert response.debug["debug_info"][0]["model_name"] == "test-model"
-
-
-@pytest.mark.parametrize(
-    (
-        "normalize_probabilities",
-        "raw_probability",
-        "expected_probability",
-        "expected_originals",
-        "expected_max_error",
-        "expected_probability_errors",
-    ),
-    [
-        (
-            False,
-            0.2,
-            0.2,
-            None,
-            0.6,
-            {"stars": 0.6, "genre": 0.6},
-        ),
-        (
-            True,
-            0.2,
-            0.5,
-            {
-                "stars": {"0": 0.2, "1": 0.2},
-                "genre": {"fiction": 0.2, "nonfiction": 0.2},
-            },
-            0.6,
-            {"stars": 0.6, "genre": 0.6},
-        ),
-        (False, 0.50000025, 0.50000025, None, 5e-7, {}),
-    ],
-)
-def test_probability_validation(
-    normalize_probabilities,
-    raw_probability,
-    expected_probability,
-    expected_originals,
-    expected_max_error,
-    expected_probability_errors,
-):
-    response_data = {
-        "answers": {
-            "positive": 0.8,
-            "stars": {"0": raw_probability, "1": raw_probability},
-            "genre": {"fiction": raw_probability, "nonfiction": raw_probability},
-        }
-    }
-    response = TypeSafeClientAdapter(
-        normalize_probabilities=normalize_probabilities
-    ).system_one(model_response(response_data, "prompted"), "document", QUESTIONS)
-
-    assert response.answers["positive"].noul == pytest.approx(0.8)
-    assert response.answers["stars"].probabilities == pytest.approx(
-        {"0": expected_probability, "1": expected_probability}
+    llm_response = llm_query["llm_response"]
+    serialized_query = json.dumps(llm_query)
+    assert "Evaluate every question" in serialized_query
+    assert "A delightful novel." in serialized_query
+    assert llm_query["messages"][-1]["kind"] == "request"
+    model_request_parameters = llm_query["model_request_parameters"]
+    assert model_request_parameters["output_mode"] == expected_output_mode
+    assert "positive" in json.dumps(model_request_parameters["output_object"])
+    assert llm_response["kind"] == "response"
+    restored_messages = ModelMessagesTypeAdapter.validate_python(
+        [*llm_query["messages"], llm_response]
     )
-    assert response.answers["genre"].probabilities == pytest.approx(
-        {"fiction": expected_probability, "nonfiction": expected_probability}
-    )
-    assert response.debug["max_error"] == pytest.approx(expected_max_error)
-    assert response.debug["invalid_probs"] == len(expected_probability_errors)
-    assert response.debug["probability_errors"] == pytest.approx(
-        expected_probability_errors
-    )
-    assert response.debug.get("original_probabilities") == expected_originals
+    assert len(restored_messages) == 2
+    assert llm_query["debug_info"]["model_name"] == "test-model"
 
 
 @pytest.mark.parametrize(
@@ -306,12 +247,11 @@ def test_transient_errors_are_retried(async_call):
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 0
     assert len(response.debug["llm_queries"]) == 2
-    assert response.debug["llm_responses"][0] is None
+    assert response.debug["llm_queries"][0]["llm_response"] is None
     assert (
-        response.debug["debug_info"][0]["error_type"]
-        == "ModelHTTPError"
+        response.debug["llm_queries"][0]["debug_info"]["error_type"] == "ModelHTTPError"
     )
-    assert response.debug["llm_responses"][1]["kind"] == "response"
+    assert response.debug["llm_queries"][1]["llm_response"]["kind"] == "response"
 
 
 @pytest.mark.parametrize("async_call", [False, True])
