@@ -75,12 +75,7 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
             [model_response],
             mode="json",
         )[0]
-        request_debug_info.update(
-            {
-                "finish_reason": model_response.finish_reason,
-                "response_model_name": model_response.model_name,
-            }
-        )
+        request_debug_info["finish_reason"] = model_response.finish_reason
         return model_response
 
     return Hooks(model_request=capture_model_request), {"llm_queries": llm_queries}

@@ -5,8 +5,6 @@ from collections.abc import Mapping
 from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
-from pydantic_ai import Agent, NativeOutput, PromptedOutput
-from pydantic_ai.models import Model
 from typesafe_client.api.models import (
     ChoiceQuestion,
     NoulQuestion,
@@ -15,18 +13,18 @@ from typesafe_client.api.models import (
 )
 from typesafe_client.values import QuestionCollectionType, question_to_api_model
 
-from typesafe_client_adapter.utils.model_request_debug import (
-    create_model_request_debug_hooks,
-)
 from typesafe_client_adapter.utils.probability_normalization import AnswerMode
 
 Probability: TypeAlias = Annotated[float, Field(ge=0, le=1)]
 
 
-def convert_and_validate_questions(
+def convert_question_collection_to_validated_api_question_models(
     questions: QuestionCollectionType,
 ) -> dict[str, Question]:
-    """Convert and validate TypeSafe questions.
+    """Convert a question collection to validated API question models.
+
+    Reject empty collections, convert dictionary questions to API model instances,
+    and require score and choice questions to define at least one criterion.
 
     :param questions: TypeSafe question collection.
     :return: Questions using API model types.
@@ -95,40 +93,6 @@ def create_llm_output_model(
             ),
         ),
     )
-
-
-def create_pydantic_ai_agent(
-    model: str | Model,
-    output_model: type[BaseModel],
-    structured_outputs: bool,
-    n_retry_malformed_structure: int,
-    instructions: str,
-) -> tuple[Agent, dict[str, list[Any]]]:
-    """Create the configured PydanticAI agent.
-
-    :param model: PydanticAI model or model name.
-    :param output_model: Pydantic output model.
-    :param structured_outputs: Whether to use native structured output.
-    :param n_retry_malformed_structure: Output validation retry count.
-    :param instructions: Agent system instructions.
-    :return: Configured agent and its model-request debug capture.
-    """
-    requested_output: Any = (
-        NativeOutput(output_model)
-        if structured_outputs
-        else PromptedOutput(output_model)
-    )
-    model_request_debug_hooks, model_request_debug_data = (
-        create_model_request_debug_hooks()
-    )
-    pydantic_agent = Agent(
-        _resolve_provider_prefixed_pydantic_ai_model(model),
-        output_type=requested_output,
-        instructions=instructions,
-        retries={"output": n_retry_malformed_structure},
-        capabilities=[model_request_debug_hooks],
-    )
-    return pydantic_agent, model_request_debug_data
 
 
 def _create_llm_answer_type_for_question(
@@ -221,13 +185,3 @@ def _serialize_instruction_value_for_prompt(value: Any) -> str:
     if isinstance(value, str):
         return value
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
-
-
-def _resolve_provider_prefixed_pydantic_ai_model(model: str | Model) -> str | Model:
-    if not isinstance(model, str) or ":" in model:
-        return model
-    if model.startswith(("gpt-", "chatgpt-", "o1", "o3", "o4")):
-        return f"openai:{model}"
-    if model.startswith("claude-"):
-        return f"anthropic:{model}"
-    return model

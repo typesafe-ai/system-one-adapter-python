@@ -179,8 +179,7 @@
           "model_name": "gpt-4o-mini",
           "model_id": "openai:gpt-4o-mini",
           "provider": "openai",
-          "finish_reason": "stop",
-          "response_model_name": "gpt-4o-mini-2024-07-18"
+          "finish_reason": "stop"
         }
       }
     ]

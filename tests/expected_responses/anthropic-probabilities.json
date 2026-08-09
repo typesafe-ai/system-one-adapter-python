@@ -237,8 +237,7 @@
           "model_name": "claude-haiku-4-5",
           "model_id": "anthropic:claude-haiku-4-5",
           "provider": "anthropic",
-          "finish_reason": "stop",
-          "response_model_name": "claude-haiku-4-5-20251001"
+          "finish_reason": "stop"
         }
       }
     ]

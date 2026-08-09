@@ -9,7 +9,7 @@ from types import TracebackType
 from typing import Any, Self, cast
 
 from pydantic import BaseModel
-from pydantic_ai import Agent
+from pydantic_ai import Agent, NativeOutput, PromptedOutput
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage
 from typesafe_client import RetryConfig, TypeSafeClient
@@ -37,6 +37,9 @@ from typesafe_client_adapter.utils.error_handling import (
     run_with_retries,
     run_with_retries_async,
 )
+from typesafe_client_adapter.utils.model_request_debug import (
+    create_model_request_debug_hooks,
+)
 from typesafe_client_adapter.utils.probability_normalization import (
     AnswerMode,
     ProbabilityNormalization,
@@ -46,9 +49,8 @@ from typesafe_client_adapter.utils.probability_normalization import (
 )
 from typesafe_client_adapter.utils.pydantic_utils import (
     Question,
-    convert_and_validate_questions,
+    convert_question_collection_to_validated_api_question_models,
     create_llm_output_model,
-    create_pydantic_ai_agent,
 )
 
 Answer = NoulAnswer | ScoreAnswer | ChoiceAnswer
@@ -228,17 +230,33 @@ class TypeSafeClientAdapter(TypeSafeClient):
         questions: QuestionCollectionType,
     ) -> _EvaluationRun:
         """Prepare the questions, output model, and agent for one evaluation."""
-        prepared_questions = convert_and_validate_questions(questions)
+        prepared_questions = (
+            convert_question_collection_to_validated_api_question_models(questions)
+        )
         output_model = create_llm_output_model(
             prepared_questions,
             self.llm_answer_mode,
         )
-        pydantic_agent, model_request_debug_data = create_pydantic_ai_agent(
-            model,
-            output_model,
-            self.structured_outputs,
-            self.n_retry_malformed_structure,
-            _SYSTEM_PROMPT,
+        requested_output: Any = (
+            NativeOutput(output_model)
+            if self.structured_outputs
+            else PromptedOutput(output_model)
+        )
+        pydantic_model: str | Model = model
+        if isinstance(model, str) and ":" not in model:
+            if model.startswith(("gpt-", "chatgpt-", "o1", "o3", "o4")):
+                pydantic_model = f"openai:{model}"
+            elif model.startswith("claude-"):
+                pydantic_model = f"anthropic:{model}"
+        model_request_debug_hooks, model_request_debug_data = (
+            create_model_request_debug_hooks()
+        )
+        pydantic_agent = Agent(
+            pydantic_model,
+            output_type=requested_output,
+            instructions=_SYSTEM_PROMPT,
+            retries={"output": self.n_retry_malformed_structure},
+            capabilities=[model_request_debug_hooks],
         )
         return _EvaluationRun(
             model_name=model if isinstance(model, str) else model.model_name,
