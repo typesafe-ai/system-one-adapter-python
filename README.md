@@ -240,23 +240,19 @@ be available in the environment.
 ```python
 import asyncio
 
+from pydantic_ai.models import infer_model
 from typesafe_client_adapter import deserialize_llm_attempt
 
-request_context = deserialize_llm_attempt(
-    response.debug["llm_attempts"][0]
-)
+llm_attempt = response.debug["llm_attempts"][0]
+model = infer_model(llm_attempt["debug_info"]["model_id"])
 replayed_response = asyncio.run(
-    request_context.model.request(
-        request_context.messages,
-        request_context.model_settings,
-        request_context.model_request_parameters,
-    )
+    model.request(*deserialize_llm_attempt(llm_attempt))
 )
 ```
 
-Pass `model=` to `deserialize_llm_attempt()` when the original call used a configured
-model instance, custom provider, or model that cannot be inferred from its recorded
-ID. Repeating a request does not guarantee identical nondeterministic model output.
+Use the original model instance instead of `infer_model()` when the call used a
+configured model or custom provider. Repeating a request does not guarantee identical
+nondeterministic model output.
 
 class TypeSafeClientAdapter(TypeSafeClient):
    def __init__(
