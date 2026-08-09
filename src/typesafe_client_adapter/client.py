@@ -204,8 +204,8 @@ class TypeSafeClientAdapter(TypeSafeClient):
 
     def __init__(
         self,
-        structured_outputs: bool = False,
-        llm_answer_mode: AnswerMode = "probabilities",
+        structured_outputs: bool,
+        llm_answer_mode: AnswerMode,
         normalize_probabilities: bool = False,
         n_retry_malformed_structure: int = 0,
         retry: RetryConfig = NoRetries(),  # noqa: B008 - reference-compatible signature

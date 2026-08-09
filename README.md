@@ -373,8 +373,9 @@ Repeating a request does not guarantee identical nondeterministic model output.
 - Structured output transport
   - `structured_outputs=False` requests plain-text JSON and does not use provider-native structured outputs or output tools
   - `structured_outputs=True` uses the provider's native structured-output mode
-- By default, it requests probabilities, but there is also a mode that supports getting discrete values
-  - it will then map the discrete value to a probability distribution of all 0s, except one element which is 1.0
+- Answer mode
+  - `llm_answer_mode="probabilities"` requests probability distributions
+  - `llm_answer_mode="discrete"` maps the selected value to a probability distribution of all 0s except one value of 1.0
 - Telemetry
   - `input_tokens` and `output_tokens` aggregate every PydanticAI request made during the call, including malformed-structure retries and attempts that later failed and were retried, so a retried call is never under-billed
   - `n_retries` counts retries of transient provider failures

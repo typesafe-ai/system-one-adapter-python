@@ -134,7 +134,10 @@ def test_provider_errors(make_error, error_type, expected_status_code):
     model = FunctionModel(raise_configured_provider_error, model_name="test-model")
 
     with pytest.raises(error_type) as raised:
-        TypeSafeClientAdapter().system_one(model, "document", {"answer": QUESTION})
+        TypeSafeClientAdapter(
+            structured_outputs=True,
+            llm_answer_mode="probabilities",
+        ).system_one(model, "document", {"answer": QUESTION})
 
     assert isinstance(raised.value, TypeSafeApiError)
     if error_type is TypeSafeUnknownError:
@@ -306,7 +309,10 @@ def test_provider_context_window_errors_are_mapped(
     model = mock_provider_model(provider, return_provider_error)
 
     with pytest.raises(expected_error) as raised:
-        TypeSafeClientAdapter().system_one(model, "document", {"answer": QUESTION})
+        TypeSafeClientAdapter(
+            structured_outputs=True,
+            llm_answer_mode="probabilities",
+        ).system_one(model, "document", {"answer": QUESTION})
 
     if expected_error is TypeSafeUnknownError:
         assert raised.value.status_code == status_code

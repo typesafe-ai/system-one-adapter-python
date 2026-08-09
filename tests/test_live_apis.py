@@ -73,22 +73,34 @@ def _remove_generated_message_metadata(value):
     ("client", "model"),
     [
         pytest.param(
-            TypeSafeClientAdapter(),
+            TypeSafeClientAdapter(
+                structured_outputs=False,
+                llm_answer_mode="probabilities",
+            ),
             "gpt-4o-mini",
             id="openai-probabilities",
         ),
         pytest.param(
-            TypeSafeClientAdapter(llm_answer_mode="discrete"),
+            TypeSafeClientAdapter(
+                structured_outputs=False,
+                llm_answer_mode="discrete",
+            ),
             "gpt-4o-mini",
             id="openai-discrete",
         ),
         pytest.param(
-            TypeSafeClientAdapter(),
+            TypeSafeClientAdapter(
+                structured_outputs=False,
+                llm_answer_mode="probabilities",
+            ),
             "claude-haiku-4-5",
             id="anthropic-probabilities",
         ),
         pytest.param(
-            TypeSafeClientAdapter(llm_answer_mode="discrete"),
+            TypeSafeClientAdapter(
+                structured_outputs=False,
+                llm_answer_mode="discrete",
+            ),
             "claude-haiku-4-5",
             id="anthropic-discrete",
         ),

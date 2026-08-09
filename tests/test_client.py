@@ -182,7 +182,7 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
 def test_transient_errors_are_retried(async_call):
     calls = 0
     success_model = model_response(
-        {"answers": {"answer": 0.75}}, expected_output_mode="prompted"
+        {"answers": {"answer": 0.75}}, expected_output_mode="native"
     )
 
     def fail_first_provider_attempt(messages, agent_info):
@@ -194,7 +194,11 @@ def test_transient_errors_are_retried(async_call):
 
     model = FunctionModel(fail_first_provider_attempt, model_name="test-model")
     retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
-    client = TypeSafeClientAdapter(retry=retry)
+    client = TypeSafeClientAdapter(
+        structured_outputs=True,
+        llm_answer_mode="probabilities",
+        retry=retry,
+    )
     questions = {"answer": QUESTIONS["positive"]}
 
     if async_call:
@@ -228,7 +232,11 @@ def test_retries_are_exhausted(async_call):
 
     model = FunctionModel(raise_retryable_provider_error, model_name="test-model")
     retry = RetryConfig(max_attempts=3, initial_backoff=0, jitter=False)
-    client = TypeSafeClientAdapter(retry=retry)
+    client = TypeSafeClientAdapter(
+        structured_outputs=True,
+        llm_answer_mode="probabilities",
+        retry=retry,
+    )
     questions = {"answer": QUESTIONS["positive"]}
 
     with pytest.raises(TypeSafeUnknownError) as raised:
@@ -268,7 +276,12 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
         model_name="test-model",
     )
     retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
-    client = TypeSafeClientAdapter(retry=retry, n_retry_malformed_structure=1)
+    client = TypeSafeClientAdapter(
+        structured_outputs=True,
+        llm_answer_mode="probabilities",
+        retry=retry,
+        n_retry_malformed_structure=1,
+    )
     questions = {"answer": QUESTIONS["positive"]}
 
     if async_call:
@@ -302,7 +315,10 @@ def test_invalid_questions_are_rejected(questions):
     model = model_response({"answers": {}}, expected_output_mode="prompted")
 
     with pytest.raises(ValueError):
-        TypeSafeClientAdapter().system_one(model, "document", questions)
+        TypeSafeClientAdapter(
+            structured_outputs=True,
+            llm_answer_mode="probabilities",
+        ).system_one(model, "document", questions)
 
 
 def test_malformed_structure_is_retried():
@@ -321,7 +337,11 @@ def test_malformed_structure_is_retried():
         return_malformed_then_valid_response,
         model_name="test-model",
     )
-    response = TypeSafeClientAdapter(n_retry_malformed_structure=1).system_one(
+    response = TypeSafeClientAdapter(
+        structured_outputs=True,
+        llm_answer_mode="probabilities",
+        n_retry_malformed_structure=1,
+    ).system_one(
         model,
         "document",
         {"answer": QUESTIONS["positive"]},
