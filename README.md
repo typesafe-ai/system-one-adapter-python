@@ -133,7 +133,7 @@ LLM response:
     "max_error": 0.0,
     "invalid_probs": 0,
     "probability_errors": {},
-    "llm_queries": [
+    "llm_attempts": [
       {
         "messages": [
           {
@@ -199,7 +199,7 @@ LLM response:
   - `invalid_probs` counts answers whose probability error exceeds `1e-6`
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
-  - `llm_queries` contains one dictionary per PydanticAI model attempt
+  - `llm_attempts` contains one dictionary per PydanticAI model attempt
     - each dictionary contains serialized messages, prepared model settings, and prepared `ModelRequestParameters`
     - request parameters preserve function tools, output tools, output mode, and the structured-output schema needed to reconstruct the call
     - `llm_response` contains the matching serialized PydanticAI `ModelResponse`, or `null` when no response arrived

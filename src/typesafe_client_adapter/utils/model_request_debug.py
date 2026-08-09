@@ -78,4 +78,4 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
         request_debug_info["finish_reason"] = model_response.finish_reason
         return model_response
 
-    return Hooks(model_request=capture_model_request), {"llm_queries": llm_queries}
+    return Hooks(model_request=capture_model_request), {"llm_attempts": llm_queries}

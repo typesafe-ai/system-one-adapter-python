@@ -122,7 +122,7 @@ def test_live_responses_match_reference_shape(
         response_data
     ) == _remove_generated_message_metadata(expected_response_data)
     if isinstance(client, TypeSafeClientAdapter):
-        for llm_query in response_data["debug"]["llm_queries"]:
+        for llm_query in response_data["debug"]["llm_attempts"]:
             llm_response = llm_query["llm_response"]
             ModelMessagesTypeAdapter.validate_python(
                 [
