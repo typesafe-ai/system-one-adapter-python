@@ -20,7 +20,7 @@
     "genre": {
       "type": "choice",
       "choice": "fiction",
-      "confidence": 0,
+      "confidence": 0.0,
       "probabilities": {
         "fiction": 0.5,
         "nonfiction": 0.5
@@ -34,7 +34,7 @@
     "n_retries_malformed_structure": 0
   },
   "debug": {
-    "max_error": 0,
+    "max_error": 0.0,
     "invalid_probs": 0,
     "probability_errors": {},
     "llm_queries": [

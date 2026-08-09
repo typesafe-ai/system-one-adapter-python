@@ -121,3 +121,7 @@ def test_live_responses_match_reference_shape(
     )
     expected_response_data = json.loads(expected_response_path.read_text())
     assert normalized_response_data == expected_response_data
+    assert json.dumps(normalized_response_data, sort_keys=True) == json.dumps(
+        expected_response_data,
+        sort_keys=True,
+    )

@@ -3,27 +3,27 @@
   "answers": {
     "positive": {
       "type": "noul",
-      "noul": 1
+      "noul": 1.0
     },
     "stars": {
       "type": "score",
-      "score": 3,
-      "confidence": 1,
+      "score": 3.0,
+      "confidence": 1.0,
       "probabilities": {
-        "0": 0,
-        "1": 0,
-        "2": 0,
-        "3": 1,
-        "4": 0
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 1.0,
+        "4": 0.0
       }
     },
     "genre": {
       "type": "choice",
       "choice": "fiction",
-      "confidence": 1,
+      "confidence": 1.0,
       "probabilities": {
-        "fiction": 1,
-        "nonfiction": 0
+        "fiction": 1.0,
+        "nonfiction": 0.0
       }
     }
   },
@@ -34,7 +34,7 @@
     "n_retries_malformed_structure": 0
   },
   "debug": {
-    "max_error": 0,
+    "max_error": 0.0,
     "invalid_probs": 0,
     "probability_errors": {},
     "llm_queries": [
