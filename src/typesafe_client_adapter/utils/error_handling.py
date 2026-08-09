@@ -1,13 +1,11 @@
-"""Provider error mapping and retry classification."""
+"""Provider error mapping and retry handling."""
 
-import asyncio
-import time
-from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
+from typing import TypeVar, cast
 
-import anthropic
 import httpx
-import openai
+from pydantic_ai import ModelAPIError, ModelHTTPError
 from typesafe_client import RetryConfig
 from typesafe_client.api.api_client import (
     TypeSafeApiError,
@@ -16,16 +14,8 @@ from typesafe_client.api.api_client import (
     TypeSafeTokensExceededError,
     TypeSafeUnknownError,
 )
+from typesafe_client.api.retry import RetryLoop, TypeSafeMaxRetriesExceededError
 
-_AUTH_ERRORS = (openai.AuthenticationError, anthropic.AuthenticationError)
-_CONNECTION_ERRORS = (
-    openai.APITimeoutError,
-    openai.APIConnectionError,
-    anthropic.APITimeoutError,
-    anthropic.APIConnectionError,
-    httpx.RequestError,
-    TimeoutError,
-)
 _TOKEN_ERROR_MARKERS = (
     "context_length_exceeded",
     "context window",
@@ -38,6 +28,13 @@ _TOKEN_ERROR_MARKERS = (
 ResultT = TypeVar("ResultT")
 
 
+class _RetryableTypeSafeTimeoutError(TypeSafeTimeoutError):
+    """Adapter timeout error compatible with the reference retry loop."""
+
+    def is_retryable(self) -> bool:
+        return True
+
+
 def run_with_retries(
     function: Callable[[], ResultT],
     retry: RetryConfig,
@@ -48,16 +45,19 @@ def run_with_retries(
     :param retry: Transient-failure retry policy.
     :return: Result and retry count.
     """
-    for attempt in range(1, retry.max_attempts + 1):
-        try:
-            return function(), attempt - 1
-        except Exception as error:  # noqa: BLE001 - unknown providers vary
-            _raise_for_nonretryable(error, attempt, retry.max_attempts)
-            delay = retry.next_delay(attempt=attempt)
-            if delay:
-                time.sleep(delay)
+    retry_loop = RetryLoop(retry)
 
-    raise AssertionError("retry loop did not return or raise")
+    def call_with_mapped_provider_errors() -> ResultT:
+        with _map_provider_errors():
+            return function()
+
+    try:
+        result = retry_loop.retry(call_with_mapped_provider_errors)
+    except TypeSafeMaxRetriesExceededError as retry_error:
+        mapped_error = retry_error.__cause__
+        assert isinstance(mapped_error, TypeSafeApiError)
+        raise mapped_error from mapped_error.__cause__
+    return cast(ResultT, result), retry_loop.attempt - 1
 
 
 async def run_with_retries_async(
@@ -70,35 +70,30 @@ async def run_with_retries_async(
     :param retry: Transient-failure retry policy.
     :return: Result and retry count.
     """
-    for attempt in range(1, retry.max_attempts + 1):
-        try:
-            return await function(), attempt - 1
-        except Exception as error:  # noqa: BLE001 - unknown providers vary
-            _raise_for_nonretryable(error, attempt, retry.max_attempts)
-            delay = retry.next_delay(attempt=attempt)
-            if delay:
-                await asyncio.sleep(delay)
+    retry_loop = RetryLoop(retry)
 
-    raise AssertionError("retry loop did not return or raise")
+    async def call_with_mapped_provider_errors() -> ResultT:
+        with _map_provider_errors():
+            return await function()
+
+    try:
+        result = await retry_loop.async_retry(call_with_mapped_provider_errors)
+    except TypeSafeMaxRetriesExceededError as retry_error:
+        mapped_error = retry_error.__cause__
+        assert isinstance(mapped_error, TypeSafeApiError)
+        raise mapped_error from mapped_error.__cause__
+    return cast(ResultT, result), retry_loop.attempt - 1
 
 
-def _raise_for_nonretryable(
-    error: Exception,
-    attempt: int,
-    max_attempts: int,
-) -> None:
-    """Raise a mapped error when another provider attempt is not allowed.
-
-    :param error: Original provider or PydanticAI error.
-    :param attempt: Current one-based attempt number.
-    :param max_attempts: Maximum provider attempts.
-    """
-    mapped_error = _map_provider_exception_to_typesafe_api_error(error)
-    if attempt >= max_attempts or not _is_retryable_provider_exception(
-        error,
-        mapped_error,
-    ):
-        raise mapped_error from error
+@contextmanager
+def _map_provider_errors() -> Iterator[None]:
+    """Map errors raised inside one PydanticAI provider attempt."""
+    try:
+        yield
+    except TypeSafeApiError:
+        raise
+    except Exception as error:
+        raise _map_provider_exception_to_typesafe_api_error(error) from error
 
 
 def _map_provider_exception_to_typesafe_api_error(
@@ -107,56 +102,17 @@ def _map_provider_exception_to_typesafe_api_error(
     if isinstance(error, TypeSafeApiError):
         return error
 
-    chain = _collect_exception_cause_chain(error)
     detail = {"message": str(error)}
-    if any(isinstance(item, _AUTH_ERRORS) for item in chain):
-        return TypeSafeAuthError(detail)
-
-    status_code = _find_http_status_code_in_exception_chain(chain)
+    status_code = error.status_code if isinstance(error, ModelHTTPError) else None
     if status_code in (401, 403):
         return TypeSafeAuthError(detail)
-    if any(isinstance(item, _CONNECTION_ERRORS) for item in chain) or status_code in (
-        408,
-        504,
-    ):
-        return TypeSafeTimeoutError(detail)
+    is_connection_error = isinstance(error, (httpx.RequestError, TimeoutError)) or (
+        isinstance(error, ModelAPIError) and not isinstance(error, ModelHTTPError)
+    )
+    if is_connection_error or status_code in (408, 504):
+        return _RetryableTypeSafeTimeoutError(detail)
 
-    error_text = " ".join(str(item).lower() for item in chain)
+    error_text = str(error).lower()
     if any(marker in error_text for marker in _TOKEN_ERROR_MARKERS):
         return TypeSafeTokensExceededError(detail)
     return TypeSafeUnknownError(detail, status_code)
-
-
-def _is_retryable_provider_exception(
-    error: Exception,
-    mapped_error: TypeSafeApiError,
-) -> bool:
-    chain = _collect_exception_cause_chain(error)
-    if any(isinstance(item, _CONNECTION_ERRORS) for item in chain):
-        return True
-    if (
-        _find_http_status_code_in_exception_chain(chain)
-        in TypeSafeUnknownError.retryable_status_codes
-    ):
-        return True
-    return (
-        isinstance(mapped_error, TypeSafeUnknownError) and mapped_error.is_retryable()
-    )
-
-
-def _collect_exception_cause_chain(error: Exception) -> list[BaseException]:
-    chain: list[BaseException] = []
-    current: BaseException | None = error
-    while current is not None and current not in chain:
-        chain.append(current)
-        current = current.__cause__ or current.__context__
-    return chain
-
-
-def _find_http_status_code_in_exception_chain(
-    chain: list[BaseException],
-) -> int | None:
-    return next(
-        (item.status_code for item in chain if hasattr(item, "status_code")),
-        None,
-    )

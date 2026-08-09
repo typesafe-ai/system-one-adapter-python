@@ -6,7 +6,7 @@ import json
 import httpx
 import pytest
 from pydantic_ai import ModelMessagesTypeAdapter
-from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
@@ -210,6 +210,11 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
         ),
         (
             lambda: ModelHTTPError(504, "test-model", {"message": "gateway timeout"}),
+            TypeSafeTimeoutError,
+            None,
+        ),
+        (
+            lambda: ModelAPIError("test-model", "connection failed"),
             TypeSafeTimeoutError,
             None,
         ),
