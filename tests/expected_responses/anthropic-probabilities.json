@@ -44,11 +44,15 @@
             "parts": [
               {
                 "content": "Document:\n\"This book was a delight to read.\"",
+                "timestamp": "2026-08-09T03:20:17.871688Z",
                 "part_kind": "user-prompt"
               }
             ],
+            "timestamp": "2026-08-09T03:20:17.871864Z",
             "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
             "kind": "request",
+            "run_id": "019fe489-18ce-73f3-9849-adc122e17d15",
+            "conversation_id": "019fe489-18ce-73f3-9849-adc22518e3b6",
             "metadata": null,
             "state": "complete"
           }
@@ -187,56 +191,55 @@
             }
           ],
           "thinking": null
-        }
-      }
-    ],
-    "llm_responses": [
-      {
-        "parts": [
-          {
-            "content": "```json\n{\n  \"answers\": {\n    \"positive\": 0.95,\n    \"stars\": {\n      \"0\": 0.01,\n      \"1\": 0.02,\n      \"2\": 0.05,\n      \"3\": 0.65,\n      \"4\": 0.27\n    },\n    \"genre\": {\n      \"fiction\": 0.5,\n      \"nonfiction\": 0.5\n    }\n  }\n}\n```",
-            "id": null,
-            "provider_name": null,
-            "provider_details": null,
-            "part_kind": "text"
-          }
-        ],
-        "usage": {
-          "input_tokens": 665,
-          "cache_write_tokens": 0,
-          "cache_read_tokens": 0,
-          "output_tokens": 118,
-          "input_audio_tokens": 0,
-          "cache_audio_read_tokens": 0,
-          "output_audio_tokens": 0,
-          "details": {
+        },
+        "llm_response": {
+          "parts": [
+            {
+              "content": "```json\n{\n  \"answers\": {\n    \"positive\": 0.95,\n    \"stars\": {\n      \"0\": 0.01,\n      \"1\": 0.02,\n      \"2\": 0.05,\n      \"3\": 0.65,\n      \"4\": 0.27\n    },\n    \"genre\": {\n      \"fiction\": 0.5,\n      \"nonfiction\": 0.5\n    }\n  }\n}\n```",
+              "id": null,
+              "provider_name": null,
+              "provider_details": null,
+              "part_kind": "text"
+            }
+          ],
+          "usage": {
             "input_tokens": 665,
+            "cache_write_tokens": 0,
+            "cache_read_tokens": 0,
             "output_tokens": 118,
-            "cache_creation_input_tokens": 0,
-            "cache_read_input_tokens": 0
+            "input_audio_tokens": 0,
+            "cache_audio_read_tokens": 0,
+            "output_audio_tokens": 0,
+            "details": {
+              "input_tokens": 665,
+              "output_tokens": 118,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "cost": null
           },
-          "cost": null
+          "model_name": "claude-haiku-4-5-20251001",
+          "timestamp": "2026-08-09T03:20:17.883233Z",
+          "kind": "response",
+          "provider_name": "anthropic",
+          "provider_url": "https://api.anthropic.com",
+          "provider_details": {
+            "finish_reason": "end_turn"
+          },
+          "provider_response_id": "msg_011CdrHZBc6hfi3PVWktGpcW",
+          "finish_reason": "stop",
+          "run_id": null,
+          "conversation_id": null,
+          "metadata": null,
+          "state": "complete"
         },
-        "model_name": "claude-haiku-4-5-20251001",
-        "kind": "response",
-        "provider_name": "anthropic",
-        "provider_url": "https://api.anthropic.com",
-        "provider_details": {
-          "finish_reason": "end_turn"
-        },
-        "provider_response_id": "msg_011CdrHZBc6hfi3PVWktGpcW",
-        "finish_reason": "stop",
-        "metadata": null,
-        "state": "complete"
-      }
-    ],
-    "debug_info": [
-      {
-        "model_name": "claude-haiku-4-5",
-        "model_id": "anthropic:claude-haiku-4-5",
-        "provider": "anthropic",
-        "finish_reason": "stop",
-        "response_model_name": "claude-haiku-4-5-20251001"
+        "debug_info": {
+          "model_name": "claude-haiku-4-5",
+          "model_id": "anthropic:claude-haiku-4-5",
+          "provider": "anthropic",
+          "finish_reason": "stop",
+          "response_model_name": "claude-haiku-4-5-20251001"
+        }
       }
     ]
   }

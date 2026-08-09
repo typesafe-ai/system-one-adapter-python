@@ -51,6 +51,23 @@ QUESTIONS = {
 }
 
 
+def _remove_generated_message_metadata(value):
+    """Remove PydanticAI values generated independently on every replay.
+
+    :param value: Nested response value.
+    :return: Copy without timestamps, run IDs, or conversation IDs.
+    """
+    if isinstance(value, dict):
+        return {
+            key: _remove_generated_message_metadata(item)
+            for key, item in value.items()
+            if key not in {"timestamp", "run_id", "conversation_id"}
+        }
+    if isinstance(value, list):
+        return [_remove_generated_message_metadata(item) for item in value]
+    return value
+
+
 @pytest.mark.vcr
 @pytest.mark.parametrize(
     ("client", "model"),
@@ -101,20 +118,15 @@ def test_live_responses_match_reference_shape(
         / f"{request.node.callspec.id}.json"
     )
     expected_response_data = json.loads(expected_response_path.read_text())
-    assert response_data == expected_response_data
+    assert _remove_generated_message_metadata(
+        response_data
+    ) == _remove_generated_message_metadata(expected_response_data)
     if isinstance(client, TypeSafeClientAdapter):
-        for llm_query, llm_response in zip(
-            response_data["debug"]["llm_queries"],
-            response_data["debug"]["llm_responses"],
-            strict=True,
-        ):
+        for llm_query in response_data["debug"]["llm_queries"]:
+            llm_response = llm_query["llm_response"]
             ModelMessagesTypeAdapter.validate_python(
                 [
                     *llm_query["messages"],
                     *([llm_response] if llm_response is not None else []),
                 ]
             )
-    assert json.dumps(response_data, sort_keys=True) == json.dumps(
-        expected_response_data,
-        sort_keys=True,
-    )

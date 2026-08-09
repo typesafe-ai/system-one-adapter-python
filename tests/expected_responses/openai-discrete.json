@@ -44,11 +44,15 @@
             "parts": [
               {
                 "content": "Document:\n\"This book was a delight to read.\"",
+                "timestamp": "2026-08-09T03:20:17.858616Z",
                 "part_kind": "user-prompt"
               }
             ],
+            "timestamp": "2026-08-09T03:20:17.858788Z",
             "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
             "kind": "request",
+            "run_id": "019fe489-18c1-7384-bca8-46bd97dc4444",
+            "conversation_id": "019fe489-18c1-7384-bca8-46be7aaf378d",
             "metadata": null,
             "state": "complete"
           }
@@ -130,55 +134,54 @@
             }
           ],
           "thinking": null
-        }
-      }
-    ],
-    "llm_responses": [
-      {
-        "parts": [
-          {
-            "content": "{\"answers\":{\"positive\":true,\"stars\":4,\"genre\":\"fiction\"}}",
-            "id": "msg_0dc48da3bd41eef4006a77d409d644819b80532e0cc7094232",
-            "provider_name": "openai",
-            "provider_details": null,
-            "part_kind": "text"
-          }
-        ],
-        "usage": {
-          "input_tokens": 365,
-          "cache_write_tokens": 0,
-          "cache_read_tokens": 0,
-          "output_tokens": 16,
-          "input_audio_tokens": 0,
-          "cache_audio_read_tokens": 0,
-          "output_audio_tokens": 0,
-          "details": {
-            "reasoning_tokens": 0
+        },
+        "llm_response": {
+          "parts": [
+            {
+              "content": "{\"answers\":{\"positive\":true,\"stars\":4,\"genre\":\"fiction\"}}",
+              "id": "msg_0dc48da3bd41eef4006a77d409d644819b80532e0cc7094232",
+              "provider_name": "openai",
+              "provider_details": null,
+              "part_kind": "text"
+            }
+          ],
+          "usage": {
+            "input_tokens": 365,
+            "cache_write_tokens": 0,
+            "cache_read_tokens": 0,
+            "output_tokens": 16,
+            "input_audio_tokens": 0,
+            "cache_audio_read_tokens": 0,
+            "output_audio_tokens": 0,
+            "details": {
+              "reasoning_tokens": 0
+            },
+            "cost": null,
+            "output_reasoning_tokens": 0
           },
-          "cost": null,
-          "output_reasoning_tokens": 0
+          "model_name": "gpt-4o-mini-2024-07-18",
+          "timestamp": "2026-08-09T03:20:17.860551Z",
+          "kind": "response",
+          "provider_name": "openai",
+          "provider_url": "https://api.openai.com/v1/",
+          "provider_details": {
+            "finish_reason": "completed",
+            "timestamp": "2026-08-09T01:12:41Z"
+          },
+          "provider_response_id": "resp_0dc48da3bd41eef4006a77d4096dd0819b8c0ca9b0b168206b",
+          "finish_reason": "stop",
+          "run_id": null,
+          "conversation_id": null,
+          "metadata": null,
+          "state": "complete"
         },
-        "model_name": "gpt-4o-mini-2024-07-18",
-        "kind": "response",
-        "provider_name": "openai",
-        "provider_url": "https://api.openai.com/v1/",
-        "provider_details": {
-          "finish_reason": "completed",
-          "timestamp": "2026-08-09T01:12:41Z"
-        },
-        "provider_response_id": "resp_0dc48da3bd41eef4006a77d4096dd0819b8c0ca9b0b168206b",
-        "finish_reason": "stop",
-        "metadata": null,
-        "state": "complete"
-      }
-    ],
-    "debug_info": [
-      {
-        "model_name": "gpt-4o-mini",
-        "model_id": "openai:gpt-4o-mini",
-        "provider": "openai",
-        "finish_reason": "stop",
-        "response_model_name": "gpt-4o-mini-2024-07-18"
+        "debug_info": {
+          "model_name": "gpt-4o-mini",
+          "model_id": "openai:gpt-4o-mini",
+          "provider": "openai",
+          "finish_reason": "stop",
+          "response_model_name": "gpt-4o-mini-2024-07-18"
+        }
       }
     ]
   }

@@ -16,11 +16,7 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
 
     :return: PydanticAI hooks and aligned request, response, and metadata lists.
     """
-    model_request_debug_data: dict[str, list[Any]] = {
-        "llm_queries": [],
-        "llm_responses": [],
-        "debug_info": [],
-    }
+    llm_queries: list[dict[str, Any]] = []
 
     async def capture_model_request(
         ctx: RunContext[Any],
@@ -41,44 +37,33 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
                 request_context.model_request_parameters,
             )
         )
-        request_index = len(model_request_debug_data["llm_queries"])
-        model_request_debug_data["llm_queries"].append(
-            {
-                "messages": ModelMessagesTypeAdapter.dump_python(
-                    request_context.messages,
-                    mode="json",
-                    exclude={
-                        "__all__": {
-                            "conversation_id": True,
-                            "parts": {"__all__": {"timestamp"}},
-                            "run_id": True,
-                            "timestamp": True,
-                        }
-                    },
-                ),
-                "model_settings": to_jsonable_python(
-                    model_settings,
-                    serialize_unknown=True,
-                ),
-                "model_request_parameters": to_jsonable_python(
-                    model_request_parameters,
-                    serialize_unknown=True,
-                ),
-            }
-        )
-        model_request_debug_data["llm_responses"].append(None)
-        model_request_debug_data["debug_info"].append(
-            {
-                "model_name": request_context.model.model_name,
-                "model_id": request_context.model.model_id,
-                "provider": request_context.model.system,
-            }
-        )
+        request_debug_info = {
+            "model_name": request_context.model.model_name,
+            "model_id": request_context.model.model_id,
+            "provider": request_context.model.system,
+        }
+        llm_query = {
+            "messages": ModelMessagesTypeAdapter.dump_python(
+                request_context.messages,
+                mode="json",
+            ),
+            "model_settings": to_jsonable_python(
+                model_settings,
+                serialize_unknown=True,
+            ),
+            "model_request_parameters": to_jsonable_python(
+                model_request_parameters,
+                serialize_unknown=True,
+            ),
+            "llm_response": None,
+            "debug_info": request_debug_info,
+        }
+        llm_queries.append(llm_query)
 
         try:
             model_response = await handler(request_context)
         except Exception as error:
-            model_request_debug_data["debug_info"][request_index].update(
+            request_debug_info.update(
                 {
                     "error": str(error),
                     "error_type": type(error).__name__,
@@ -86,20 +71,11 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
             )
             raise
 
-        model_request_debug_data["llm_responses"][request_index] = (
-            ModelMessagesTypeAdapter.dump_python(
-                [model_response],
-                mode="json",
-                exclude={
-                    "__all__": {
-                        "conversation_id",
-                        "run_id",
-                        "timestamp",
-                    }
-                },
-            )[0]
-        )
-        model_request_debug_data["debug_info"][request_index].update(
+        llm_query["llm_response"] = ModelMessagesTypeAdapter.dump_python(
+            [model_response],
+            mode="json",
+        )[0]
+        request_debug_info.update(
             {
                 "finish_reason": model_response.finish_reason,
                 "response_model_name": model_response.model_name,
@@ -107,4 +83,4 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
         )
         return model_response
 
-    return Hooks(model_request=capture_model_request), model_request_debug_data
+    return Hooks(model_request=capture_model_request), {"llm_queries": llm_queries}

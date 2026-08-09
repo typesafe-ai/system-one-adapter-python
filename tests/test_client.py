@@ -142,7 +142,7 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert response.debug["probability_errors"] == {}
 
     llm_query = response.debug["llm_queries"][0]
-    llm_response = response.debug["llm_responses"][0]
+    llm_response = llm_query["llm_response"]
     serialized_query = json.dumps(llm_query)
     assert "Evaluate every question" in serialized_query
     assert "A delightful novel." in serialized_query
@@ -155,7 +155,7 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
         [*llm_query["messages"], llm_response]
     )
     assert len(restored_messages) == 2
-    assert response.debug["debug_info"][0]["model_name"] == "test-model"
+    assert llm_query["debug_info"]["model_name"] == "test-model"
 
 
 @pytest.mark.parametrize(
@@ -247,9 +247,11 @@ def test_transient_errors_are_retried(async_call):
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 0
     assert len(response.debug["llm_queries"]) == 2
-    assert response.debug["llm_responses"][0] is None
-    assert response.debug["debug_info"][0]["error_type"] == "ModelHTTPError"
-    assert response.debug["llm_responses"][1]["kind"] == "response"
+    assert response.debug["llm_queries"][0]["llm_response"] is None
+    assert (
+        response.debug["llm_queries"][0]["debug_info"]["error_type"] == "ModelHTTPError"
+    )
+    assert response.debug["llm_queries"][1]["llm_response"]["kind"] == "response"
 
 
 @pytest.mark.parametrize("async_call", [False, True])
