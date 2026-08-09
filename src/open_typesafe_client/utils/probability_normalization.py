@@ -55,6 +55,24 @@ class ProbabilityNormalizationStats:
         return usage_data
 
 
+def to_distribution(probabilities: dict[str, float]) -> dict[str, float]:
+    """Rescale probabilities to sum to 1, falling back to uniform for a zero total.
+
+    Used wherever a value only has meaning over a true distribution (such as a score
+    expected value), independent of whether the reported probabilities are normalized.
+
+    :param probabilities: Probabilities keyed by label.
+    :return: Probabilities summing to 1.
+    """
+    total = sum(probabilities.values())
+    if total == 0:
+        uniform_probability = 1.0 / len(probabilities)
+        return dict.fromkeys(probabilities, uniform_probability)
+    return {
+        label: probability / total for label, probability in probabilities.items()
+    }
+
+
 def normalize_probabilities(
     labels: list[str],
     value: Any,
@@ -80,12 +98,5 @@ def normalize_probabilities(
     if not enabled or error <= PROBABILITY_TOLERANCE:
         return ProbabilityNormalization(original_probabilities, error)
 
-    if total == 0:
-        uniform_probability = 1.0 / len(original_probabilities)
-        probabilities = {label: uniform_probability for label in original_probabilities}
-    else:
-        probabilities = {
-            label: probability / total
-            for label, probability in original_probabilities.items()
-        }
+    probabilities = to_distribution(original_probabilities)
     return ProbabilityNormalization(probabilities, error, original_probabilities)

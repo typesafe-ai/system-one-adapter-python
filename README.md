@@ -144,7 +144,7 @@ TypeSafe response:
 - By default, it requests probabilities, but there is also a mode that supports getting discrete values
   - it will then map the discrete value to a probability distribution of all 0s, except one element which is 1.0
 - Telemetry
-  - `input_tokens` and `output_tokens` aggregate all PydanticAI requests in the successful run, including malformed-structure retries
+  - `input_tokens` and `output_tokens` aggregate every PydanticAI request made during the call, including malformed-structure retries and attempts that later failed and were retried, so a retried call is never under-billed
   - `n_retries` counts retries of transient provider failures
   - `n_retries_malformed_structure` counts PydanticAI corrective retries for malformed output
   - `latency` is end-to-end request latency in seconds, including retries

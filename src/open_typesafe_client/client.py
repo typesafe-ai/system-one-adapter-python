@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Mapping
+from dataclasses import dataclass, field
 from types import TracebackType
 from typing import Any, Self, cast
 
 from pydantic import BaseModel
+from pydantic_ai import Agent
 from pydantic_ai.models import Model
+from pydantic_ai.usage import RunUsage
 from typesafe_client import RetryConfig, TypeSafeClient
 from typesafe_client.api.models import (
     ChoiceAnswer,
@@ -40,6 +42,7 @@ from open_typesafe_client.utils.probability_normalization import (
     ProbabilityNormalization,
     ProbabilityNormalizationStats,
     normalize_probabilities,
+    to_distribution,
 )
 from open_typesafe_client.utils.pydantic_utils import (
     Question,
@@ -82,7 +85,13 @@ def _answer(
             should_normalize_probabilities,
         )
         probabilities = probability_normalization.probabilities
-        score = sum(index * probabilities[str(index)] for index in range(len(labels)))
+        # The score is an expected value, so it is only meaningful over a distribution
+        # summing to 1. Normalize explicitly here: the reported probabilities are left
+        # untouched when ``normalize_probabilities`` is disabled.
+        score_distribution = to_distribution(probabilities)
+        score = sum(
+            index * score_distribution[str(index)] for index in range(len(labels))
+        )
         answer = ScoreAnswer(
             type=QuestionType.Score,
             score=score,
@@ -109,41 +118,66 @@ def _answer(
     return answer, probability_normalization
 
 
-def _response(
-    model: str,
-    questions: Mapping[str, Question],
-    output: BaseModel,
-    input_tokens: int,
-    output_tokens: int,
-    n_retries: int,
-    n_retries_malformed_structure: int,
-    latency: float,
-    llm_answer_mode: AnswerMode,
-    should_normalize_probabilities: bool,
-) -> SystemOneResponse:
-    raw_answers = output.model_dump(mode="python", by_alias=True)["answers"]
-    answers: dict[str, Answer] = {}
-    probability_normalization_stats = ProbabilityNormalizationStats()
-    for question_id, question in questions.items():
-        answer, probability_normalization = _answer(
-            question,
-            raw_answers[question_id],
-            llm_answer_mode,
-            should_normalize_probabilities,
-        )
-        answers[question_id] = answer
-        probability_normalization_stats.add(question_id, probability_normalization)
+@dataclass
+class _Evaluation:
+    """State shared by the synchronous and asynchronous ``system_one`` paths.
 
-    usage_data: dict[str, Any] = {
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "n_retries": n_retries,
-        "n_retries_malformed_structure": n_retries_malformed_structure,
-        "latency": latency,
-    }
-    usage_data.update(probability_normalization_stats.usage_data())
-    usage = Usage(**usage_data)
-    return SystemOneResponse(model=model, answers=answers, usage=usage)
+    ``run_usage`` is threaded through every PydanticAI attempt so that tokens spent on
+    attempts which later failed are still billed to the caller.
+    """
+
+    model_name: str
+    questions: dict[str, Question]
+    pydantic_agent: Agent
+    llm_answer_mode: AnswerMode
+    should_normalize_probabilities: bool
+    run_usage: RunUsage = field(default_factory=RunUsage)
+    started_at: float = field(default_factory=time.perf_counter)
+    _requests_before_attempt: int = 0
+
+    def begin_attempt(self) -> None:
+        """Record the request count so the final attempt's retries can be counted."""
+        self._requests_before_attempt = self.run_usage.requests
+
+    def response(self, output: BaseModel, n_retries: int) -> SystemOneResponse:
+        """Build the response from a successful attempt.
+
+        :param output: Validated LLM output model.
+        :param n_retries: Transient-failure retries performed.
+        :return: TypeSafe-shaped response.
+        """
+        latency = time.perf_counter() - self.started_at
+        raw_answers = output.model_dump(mode="python", by_alias=True)["answers"]
+        answers: dict[str, Answer] = {}
+        probability_normalization_stats = ProbabilityNormalizationStats()
+        for question_id, question in self.questions.items():
+            answer, probability_normalization = _answer(
+                question,
+                raw_answers[question_id],
+                self.llm_answer_mode,
+                self.should_normalize_probabilities,
+            )
+            answers[question_id] = answer
+            probability_normalization_stats.add(question_id, probability_normalization)
+
+        # Only the final attempt's extra requests are corrective output retries;
+        # earlier attempts were separate agent runs counted by ``n_retries``.
+        n_retries_malformed_structure = max(
+            0, self.run_usage.requests - self._requests_before_attempt - 1
+        )
+        usage_data: dict[str, Any] = {
+            "input_tokens": self.run_usage.input_tokens,
+            "output_tokens": self.run_usage.output_tokens,
+            "n_retries": n_retries,
+            "n_retries_malformed_structure": n_retries_malformed_structure,
+            "latency": latency,
+        }
+        usage_data.update(probability_normalization_stats.usage_data())
+        return SystemOneResponse(
+            model=self.model_name,
+            answers=answers,
+            usage=Usage(**usage_data),
+        )
 
 
 class OpenTypeSafeClient(TypeSafeClient):
@@ -164,6 +198,10 @@ class OpenTypeSafeClient(TypeSafeClient):
         n_retry_malformed_structure: int = 0,
         retry: RetryConfig = NoRetries(),  # noqa: B008 - reference-compatible signature
     ) -> None:
+        # ``TypeSafeClient.__init__`` is deliberately not called: it requires a TypeSafe
+        # API key and builds ``self._api_client``, neither of which this client uses.
+        # Every inherited method that touches ``self._api_client`` is overridden
+        # below, so a new one must be overridden here too or it raises AttributeError.
         if llm_answer_mode not in ("probabilities", "discrete"):
             raise ValueError("llm_answer_mode must be 'probabilities' or 'discrete'")
         if n_retry_malformed_structure < 0:
@@ -175,13 +213,12 @@ class OpenTypeSafeClient(TypeSafeClient):
         self.n_retry_malformed_structure = n_retry_malformed_structure
         self.retry = retry
 
-    def system_one(
+    def _evaluation(
         self,
         model: str | Model,
-        document: InstructionValue,
         questions: QuestionCollectionType,
-    ) -> SystemOneResponse:
-        """Synchronously evaluate ``questions`` against one ``document``."""
+    ) -> _Evaluation:
+        """Prepare the questions, output model, and agent for one evaluation."""
         prepared_questions = prepare_questions(questions)
         output_model = create_llm_output_model(
             prepared_questions,
@@ -194,25 +231,32 @@ class OpenTypeSafeClient(TypeSafeClient):
             self.n_retry_malformed_structure,
             _SYSTEM_PROMPT,
         )
-        started_at = time.perf_counter()
+        return _Evaluation(
+            model_name=get_model_name(model),
+            questions=prepared_questions,
+            pydantic_agent=pydantic_agent,
+            llm_answer_mode=self.llm_answer_mode,
+            should_normalize_probabilities=self.normalize_probabilities,
+        )
 
-        result, n_retries = run_with_retries(
-            lambda: pydantic_agent.run_sync(_prompt(document)),
-            self.retry,
-        )
-        latency = time.perf_counter() - started_at
-        return _response(
-            get_model_name(model),
-            prepared_questions,
-            cast(BaseModel, result.output),
-            result.usage.input_tokens,
-            result.usage.output_tokens,
-            n_retries,
-            max(0, result.usage.requests - 1),
-            latency,
-            self.llm_answer_mode,
-            self.normalize_probabilities,
-        )
+    def system_one(
+        self,
+        model: str | Model,
+        document: InstructionValue,
+        questions: QuestionCollectionType,
+    ) -> SystemOneResponse:
+        """Synchronously evaluate ``questions`` against one ``document``."""
+        evaluation = self._evaluation(model, questions)
+
+        def attempt() -> Any:
+            evaluation.begin_attempt()
+            return evaluation.pydantic_agent.run_sync(
+                _prompt(document),
+                usage=evaluation.run_usage,
+            )
+
+        result, n_retries = run_with_retries(attempt, self.retry)
+        return evaluation.response(cast(BaseModel, result.output), n_retries)
 
     async def system_one_async(
         self,
@@ -221,37 +265,17 @@ class OpenTypeSafeClient(TypeSafeClient):
         questions: QuestionCollectionType,
     ) -> SystemOneResponse:
         """Asynchronously evaluate ``questions`` against one ``document``."""
-        prepared_questions = prepare_questions(questions)
-        output_model = create_llm_output_model(
-            prepared_questions,
-            self.llm_answer_mode,
-        )
-        pydantic_agent = create_pydantic_ai_agent(
-            model,
-            output_model,
-            self.structured_outputs,
-            self.n_retry_malformed_structure,
-            _SYSTEM_PROMPT,
-        )
-        started_at = time.perf_counter()
+        evaluation = self._evaluation(model, questions)
 
-        result, n_retries = await run_with_retries_async(
-            lambda: pydantic_agent.run(_prompt(document)),
-            self.retry,
-        )
-        latency = time.perf_counter() - started_at
-        return _response(
-            get_model_name(model),
-            prepared_questions,
-            cast(BaseModel, result.output),
-            result.usage.input_tokens,
-            result.usage.output_tokens,
-            n_retries,
-            max(0, result.usage.requests - 1),
-            latency,
-            self.llm_answer_mode,
-            self.normalize_probabilities,
-        )
+        def attempt() -> Any:
+            evaluation.begin_attempt()
+            return evaluation.pydantic_agent.run(
+                _prompt(document),
+                usage=evaluation.run_usage,
+            )
+
+        result, n_retries = await run_with_retries_async(attempt, self.retry)
+        return evaluation.response(cast(BaseModel, result.output), n_retries)
 
     def close(self) -> None:
         """Close the client.
