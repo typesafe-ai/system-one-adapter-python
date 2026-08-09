@@ -45,7 +45,9 @@ def model_response(response_data, expected_output_mode, expected_descriptions=()
         assert parameters.output_mode == expected_output_mode
         prompted_output_instructions = parameters.prompted_output_instructions
         if expected_output_mode == "prompted":
-            assert prompted_output_instructions
+            assert prompted_output_instructions, (
+                "Prompted output mode requires output instructions"
+            )
             assert (
                 sum(
                     instruction_part.content == prompted_output_instructions
