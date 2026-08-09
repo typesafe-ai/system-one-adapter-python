@@ -19,6 +19,7 @@ from open_typesafe_client.utils.confidence_metrics import (
     choice_confidence,
     score_confidence,
 )
+from open_typesafe_client.utils.error_handling import run_with_retries
 
 QUESTIONS = {
     "positive": NoulQuestion(instructions="The review is positive."),
@@ -38,8 +39,10 @@ def test_client_is_typesafe_client():
     ("confidence_metric", "probabilities", "expected_confidence"),
     [
         (score_confidence, [0.2] * 5, 0.0),
+        (score_confidence, [0.04] * 5, 0.0),
         (score_confidence, [0.01, 0.02, 0.07, 0.3, 0.6], 0.55),
         (choice_confidence, [0.5, 0.5], 0.0),
+        (choice_confidence, [0.2, 0.2], 0.0),
         (choice_confidence, [0.82, 0.18], 0.64),
         (score_confidence, [1.0], 1.0),
         (choice_confidence, [1.0], 1.0),
@@ -241,6 +244,32 @@ def test_transient_errors_are_retried():
     assert calls == 2
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 0
+
+
+@pytest.mark.parametrize("status_code", [408, 504])
+def test_status_errors_are_retried(status_code):
+    class ProviderStatusError(Exception):
+        def __init__(self, status_code):
+            super().__init__(f"HTTP {status_code}")
+            self.status_code = status_code
+
+    calls = 0
+
+    def respond():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise ProviderStatusError(status_code)
+        return "success"
+
+    result, n_retries = run_with_retries(
+        respond,
+        RetryConfig(max_attempts=2, initial_backoff=0, jitter=False),
+    )
+
+    assert result == "success"
+    assert calls == 2
+    assert n_retries == 1
 
 
 def test_malformed_structure_is_retried():

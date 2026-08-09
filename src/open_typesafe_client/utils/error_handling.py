@@ -8,7 +8,6 @@ from typing import TypeVar
 import anthropic
 import httpx
 import openai
-from pydantic_ai.exceptions import ModelHTTPError
 from typesafe_client import RetryConfig
 from typesafe_client.api.api_client import (
     TypeSafeApiError,
@@ -108,14 +107,7 @@ def _map_error(error: Exception) -> TypeSafeApiError:
     if any(isinstance(item, _AUTH_ERRORS) for item in chain):
         return TypeSafeAuthError(detail)
 
-    status_code = next(
-        (
-            item.status_code
-            for item in chain
-            if isinstance(item, ModelHTTPError) or hasattr(item, "status_code")
-        ),
-        None,
-    )
+    status_code = _status_code(chain)
     if status_code in (401, 403):
         return TypeSafeAuthError(detail)
     if any(isinstance(item, _CONNECTION_ERRORS) for item in chain) or status_code in (
@@ -134,11 +126,7 @@ def _retryable(error: Exception, mapped_error: TypeSafeApiError) -> bool:
     chain = _error_chain(error)
     if any(isinstance(item, _CONNECTION_ERRORS) for item in chain):
         return True
-    if any(
-        isinstance(item, ModelHTTPError)
-        and item.status_code in TypeSafeUnknownError.retryable_status_codes
-        for item in chain
-    ):
+    if _status_code(chain) in TypeSafeUnknownError.retryable_status_codes:
         return True
     return (
         isinstance(mapped_error, TypeSafeUnknownError) and mapped_error.is_retryable()
@@ -152,3 +140,10 @@ def _error_chain(error: Exception) -> list[BaseException]:
         chain.append(current)
         current = current.__cause__ or current.__context__
     return chain
+
+
+def _status_code(chain: list[BaseException]) -> int | None:
+    return next(
+        (item.status_code for item in chain if hasattr(item, "status_code")),
+        None,
+    )
