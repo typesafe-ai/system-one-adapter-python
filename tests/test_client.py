@@ -3,14 +3,19 @@
 import asyncio
 import json
 
+import httpx
 import pytest
+from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
 from typesafe_client import RetryConfig, TypeSafeClient
 from typesafe_client.api.api_client import (
+    TypeSafeApiError,
     TypeSafeAuthError,
+    TypeSafeTimeoutError,
     TypeSafeTokensExceededError,
+    TypeSafeUnknownError,
 )
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
@@ -198,29 +203,68 @@ def test_probability_validation(
 
 
 @pytest.mark.parametrize(
-    ("status_code", "body", "error_type"),
+    ("make_error", "error_type", "expected_status_code"),
     [
-        (401, {"message": "bad key"}, TypeSafeAuthError),
-        (400, {"message": "context_length_exceeded"}, TypeSafeTokensExceededError),
+        (
+            lambda: ModelHTTPError(401, "test-model", {"message": "bad key"}),
+            TypeSafeAuthError,
+            None,
+        ),
+        (
+            lambda: ModelHTTPError(403, "test-model", {"message": "forbidden"}),
+            TypeSafeAuthError,
+            None,
+        ),
+        (
+            lambda: ModelHTTPError(
+                400, "test-model", {"message": "context_length_exceeded"}
+            ),
+            TypeSafeTokensExceededError,
+            None,
+        ),
+        (
+            lambda: ModelHTTPError(408, "test-model", {"message": "request timeout"}),
+            TypeSafeTimeoutError,
+            None,
+        ),
+        (
+            lambda: ModelHTTPError(504, "test-model", {"message": "gateway timeout"}),
+            TypeSafeTimeoutError,
+            None,
+        ),
+        (lambda: httpx.ConnectError("connection refused"), TypeSafeTimeoutError, None),
+        (lambda: TimeoutError("timed out"), TypeSafeTimeoutError, None),
+        (
+            lambda: ModelHTTPError(500, "test-model", {"message": "boom"}),
+            TypeSafeUnknownError,
+            500,
+        ),
+        (
+            lambda: ModelHTTPError(418, "test-model", {"message": "teapot"}),
+            TypeSafeUnknownError,
+            418,
+        ),
+        (lambda: RuntimeError("something else"), TypeSafeUnknownError, None),
     ],
 )
-def test_provider_errors(status_code, body, error_type):
-    from pydantic_ai.exceptions import ModelHTTPError
-
+def test_provider_errors(make_error, error_type, expected_status_code):
     def fail(messages, agent_info):
-        raise ModelHTTPError(status_code, "test-model", body)
+        raise make_error()
 
     model = FunctionModel(fail, model_name="test-model")
 
-    with pytest.raises(error_type):
+    with pytest.raises(error_type) as raised:
         OpenTypeSafeClient().system_one(
             model, "document", {"answer": QUESTIONS["positive"]}
         )
 
+    assert isinstance(raised.value, TypeSafeApiError)
+    if error_type is TypeSafeUnknownError:
+        assert raised.value.status_code == expected_status_code
 
-def test_transient_errors_are_retried():
-    from pydantic_ai.exceptions import ModelHTTPError
 
+@pytest.mark.parametrize("async_call", [False, True])
+def test_transient_errors_are_retried(async_call):
     calls = 0
     success_model = model_response(
         {"answers": {"answer": 0.75}}, expected_output_mode="prompted"
@@ -235,15 +279,101 @@ def test_transient_errors_are_retried():
 
     model = FunctionModel(respond, model_name="test-model")
     retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
-    response = OpenTypeSafeClient(retry=retry).system_one(
-        model,
-        "document",
-        {"answer": QUESTIONS["positive"]},
-    )
+    client = OpenTypeSafeClient(retry=retry)
+    questions = {"answer": QUESTIONS["positive"]}
+
+    if async_call:
+        response = asyncio.run(client.system_one_async(model, "document", questions))
+    else:
+        response = client.system_one(model, "document", questions)
 
     assert calls == 2
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 0
+
+
+@pytest.mark.parametrize("async_call", [False, True])
+def test_retries_are_exhausted(async_call):
+    calls = 0
+
+    def respond(messages, agent_info):
+        nonlocal calls
+        calls += 1
+        raise ModelHTTPError(503, "test-model", {"message": "unavailable"})
+
+    model = FunctionModel(respond, model_name="test-model")
+    retry = RetryConfig(max_attempts=3, initial_backoff=0, jitter=False)
+    client = OpenTypeSafeClient(retry=retry)
+    questions = {"answer": QUESTIONS["positive"]}
+
+    with pytest.raises(TypeSafeUnknownError) as raised:
+        if async_call:
+            asyncio.run(client.system_one_async(model, "document", questions))
+        else:
+            client.system_one(model, "document", questions)
+
+    assert calls == 3
+    assert raised.value.status_code == 503
+
+
+@pytest.mark.parametrize("async_call", [False, True])
+def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
+    """Tokens burned by an attempt that later failed are still billed to the caller."""
+    calls = 0
+
+    def respond(messages, agent_info):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            # Burns tokens, then fails structural validation.
+            return ModelResponse(
+                [TextPart(json.dumps({"answers": "not-an-object"}))],
+                usage=RequestUsage(input_tokens=100, output_tokens=50),
+            )
+        if calls == 2:
+            # The corrective retry dies transiently, failing the whole attempt.
+            raise ModelHTTPError(503, "test-model", {"message": "unavailable"})
+        return ModelResponse(
+            [TextPart(json.dumps({"answers": {"answer": 0.75}}))],
+            usage=RequestUsage(input_tokens=100, output_tokens=50),
+        )
+
+    model = FunctionModel(respond, model_name="test-model")
+    retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
+    client = OpenTypeSafeClient(retry=retry, n_retry_malformed_structure=1)
+    questions = {"answer": QUESTIONS["positive"]}
+
+    if async_call:
+        response = asyncio.run(client.system_one_async(model, "document", questions))
+    else:
+        response = client.system_one(model, "document", questions)
+
+    assert calls == 3
+    assert response.usage.input_tokens == 200
+    assert response.usage.output_tokens == 100
+    assert response.usage.n_retries == 1
+    assert response.usage.n_retries_malformed_structure == 0
+
+
+@pytest.mark.parametrize(
+    "questions",
+    [
+        pytest.param({}, id="no-questions"),
+        pytest.param(
+            {"stars": ScoreQuestion(instructions="Rating.", criteria=[])},
+            id="empty-score-criteria",
+        ),
+        pytest.param(
+            {"genre": ChoiceQuestion(instructions="Genre.", criteria={})},
+            id="empty-choice-criteria",
+        ),
+    ],
+)
+def test_invalid_questions_are_rejected(questions):
+    model = model_response({"answers": {}}, expected_output_mode="prompted")
+
+    with pytest.raises(ValueError):
+        OpenTypeSafeClient().system_one(model, "document", questions)
 
 
 @pytest.mark.parametrize("status_code", [408, 504])

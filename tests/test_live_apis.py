@@ -197,7 +197,11 @@ QUESTIONS = {
             id="anthropic-discrete",
         ),
         pytest.param(
-            TypeSafeClient(),
+            TypeSafeClient(
+                # Demanded at construction; a placeholder keeps a fully
+                # cached run working without credentials.
+                api_key=os.environ.get("TYPESAFE_API_KEY", "cache-only")
+            ),
             "speed_latest",
             {
                 "model": "speed_latest",
