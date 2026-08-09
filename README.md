@@ -43,12 +43,51 @@ questions = {
     ),
 }
 
-llm_response = typesafe_client_adapter.system_one("gpt-4o-mini", document, questions)
 typesafe_response = typesafe_client.system_one("speed_latest", document, questions)
+llm_response = typesafe_client_adapter.system_one("gpt-4o-mini", document, questions)
 
 # llm_response will have a nearly identical shape to typesafe_response
-print(llm_response.model_dump_json(indent=2))
 print(typesafe_response.model_dump_json(indent=2))
+print(llm_response.model_dump_json(indent=2))
+```
+
+TypeSafe response:
+
+```json
+{
+  "model": "speed_latest",
+  "answers": {
+    "positive": {
+      "type": "noul",
+      "noul": 0.98
+    },
+    "stars": {
+      "type": "score",
+      "score": 3.635,
+      "confidence": 0.6958333333333333,
+      "probabilities": {
+        "0": 0.005,
+        "1": 0.005,
+        "2": 0.04,
+        "3": 0.25,
+        "4": 0.7
+      }
+    },
+    "genre": {
+      "type": "choice",
+      "choice": "fiction",
+      "confidence": 0.76,
+      "probabilities": {
+        "fiction": 0.88,
+        "nonfiction": 0.12
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 287,
+    "output_tokens": 47
+  }
+}
 ```
 
 LLM response:
@@ -111,45 +150,6 @@ LLM response:
         }
       }
     ]
-  }
-}
-```
-
-TypeSafe response:
-
-```json
-{
-  "model": "speed_latest",
-  "answers": {
-    "positive": {
-      "type": "noul",
-      "noul": 0.98
-    },
-    "stars": {
-      "type": "score",
-      "score": 3.635,
-      "confidence": 0.6958333333333333,
-      "probabilities": {
-        "0": 0.005,
-        "1": 0.005,
-        "2": 0.04,
-        "3": 0.25,
-        "4": 0.7
-      }
-    },
-    "genre": {
-      "type": "choice",
-      "choice": "fiction",
-      "confidence": 0.76,
-      "probabilities": {
-        "fiction": 0.88,
-        "nonfiction": 0.12
-      }
-    }
-  },
-  "usage": {
-    "input_tokens": 287,
-    "output_tokens": 47
   }
 }
 ```
