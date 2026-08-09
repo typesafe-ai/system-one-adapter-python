@@ -57,8 +57,7 @@ Answer = NoulAnswer | ScoreAnswer | ChoiceAnswer
 
 _SYSTEM_PROMPT = """Evaluate every question using only the supplied document.
 Return every requested answer. Probability objects are complete probability
-distributions: every value is between 0 and 1 and the values sum to 1.
-Do not add facts which are not supported by the document."""
+distributions: every value is between 0 and 1 and the values sum to 1."""
 
 
 def _prompt(document: InstructionValue) -> str:

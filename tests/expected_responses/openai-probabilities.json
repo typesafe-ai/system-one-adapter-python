@@ -49,7 +49,7 @@
               }
             ],
             "timestamp": "<dynamic>",
-            "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.\nDo not add facts which are not supported by the document.",
+            "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
             "kind": "request",
             "run_id": "<dynamic>",
             "conversation_id": "<dynamic>",
@@ -192,7 +192,7 @@
           "allow_image_output": false,
           "instruction_parts": [
             {
-              "content": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.\nDo not add facts which are not supported by the document.",
+              "content": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
               "dynamic": false,
               "part_kind": "instruction"
             },
