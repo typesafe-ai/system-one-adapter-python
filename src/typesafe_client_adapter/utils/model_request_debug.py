@@ -31,12 +31,6 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
         :param handler: Function performing the model request.
         :return: Unchanged model response.
         """
-        model_settings, model_request_parameters = (
-            request_context.model.prepare_request(
-                request_context.model_settings,
-                request_context.model_request_parameters,
-            )
-        )
         request_debug_info = {
             "model_name": request_context.model.model_name,
             "model_id": request_context.model.model_id,
@@ -48,11 +42,11 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
                 mode="json",
             ),
             "model_settings": to_jsonable_python(
-                model_settings,
+                request_context.model_settings,
                 serialize_unknown=True,
             ),
             "model_request_parameters": to_jsonable_python(
-                model_request_parameters,
+                request_context.model_request_parameters,
                 serialize_unknown=True,
             ),
             "llm_response": None,

@@ -200,7 +200,7 @@ LLM response:
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
   - `llm_attempts` contains one dictionary per PydanticAI model attempt
-    - each dictionary contains serialized messages, prepared model settings, and prepared `ModelRequestParameters`
+    - each dictionary contains serialized messages, model settings, and `ModelRequestParameters`
     - request parameters preserve function tools, output tools, output mode, and the structured-output schema needed to reconstruct the call
     - `llm_response` contains the matching serialized PydanticAI `ModelResponse`, or `null` when no response arrived
     - `debug_info` contains model, provider, finish-reason, and error metadata for that attempt

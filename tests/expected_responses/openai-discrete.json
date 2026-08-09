@@ -44,15 +44,15 @@
             "parts": [
               {
                 "content": "Document:\n\"This book was a delight to read.\"",
-                "timestamp": "2026-08-09T03:20:17.858616Z",
+                "timestamp": "2026-08-09T04:09:49.496057Z",
                 "part_kind": "user-prompt"
               }
             ],
-            "timestamp": "2026-08-09T03:20:17.858788Z",
+            "timestamp": "2026-08-09T04:09:49.496223Z",
             "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
             "kind": "request",
-            "run_id": "019fe489-18c1-7384-bca8-46bd97dc4444",
-            "conversation_id": "019fe489-18c1-7384-bca8-46be7aaf378d",
+            "run_id": "019fe4b6-70b7-7087-80f7-f477a4520f29",
+            "conversation_id": "019fe4b6-70b7-7087-80f7-f478d4a2cf0e",
             "metadata": null,
             "state": "complete"
           }
@@ -61,26 +61,11 @@
         "model_request_parameters": {
           "function_tools": [],
           "native_tools": [],
-          "tool_visibility": {},
+          "tool_visibility": null,
           "revealed_tool_names": [],
           "output_mode": "prompted",
           "output_object": {
             "json_schema": {
-              "additionalProperties": false,
-              "properties": {
-                "answers": {
-                  "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.",
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/TypeSafeAnswers"
-                    }
-                  ]
-                }
-              },
-              "required": [
-                "answers"
-              ],
-              "type": "object",
               "$defs": {
                 "TypeSafeAnswers": {
                   "additionalProperties": false,
@@ -109,26 +94,34 @@
                     "stars",
                     "genre"
                   ],
+                  "title": "TypeSafeAnswers",
                   "type": "object"
                 }
-              }
+              },
+              "additionalProperties": false,
+              "properties": {
+                "answers": {
+                  "$ref": "#/$defs/TypeSafeAnswers",
+                  "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key."
+                }
+              },
+              "required": [
+                "answers"
+              ],
+              "title": "TypeSafeEvaluation",
+              "type": "object"
             },
             "name": "TypeSafeEvaluation",
             "description": null,
-            "strict": true
+            "strict": null
           },
           "output_tools": [],
-          "prompted_output_template": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{schema}\n\nDon't include any text or Markdown fencing before or after.\n",
+          "prompted_output_template": null,
           "allow_text_output": true,
           "allow_image_output": false,
           "instruction_parts": [
             {
               "content": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
-              "dynamic": false,
-              "part_kind": "instruction"
-            },
-            {
-              "content": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{\"additionalProperties\": false, \"properties\": {\"answers\": {\"description\": \"Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.\", \"anyOf\": [{\"$ref\": \"#/$defs/TypeSafeAnswers\"}]}}, \"required\": [\"answers\"], \"type\": \"object\", \"$defs\": {\"TypeSafeAnswers\": {\"additionalProperties\": false, \"properties\": {\"positive\": {\"description\": \"The book review is positive.\", \"type\": \"boolean\"}, \"stars\": {\"description\": \"Star rating for the book based on the review.\\nScore levels, answer with the integer:\\n0 = Horrendous. Unreadable garbage.\\n1 = Pretty bad, but theoretically readable.\\n2 = Acceptable, but just barely.\\n3 = Pretty good. Worth reading but not perfect.\\n4 = Transcendent and impactful. A must read.\", \"exclusiveMaximum\": 5, \"minimum\": 0, \"type\": \"integer\"}, \"genre\": {\"description\": \"Which genre this review is about.\\nChoice labels, answer with one label:\\nfiction = A novel or short story.\\nnonfiction = A book based on facts, real events, or ideas.\", \"enum\": [\"fiction\", \"nonfiction\"], \"type\": \"string\"}}, \"required\": [\"positive\", \"stars\", \"genre\"], \"type\": \"object\"}}, \"title\": \"TypeSafeEvaluation\"}\n\nDon't include any text or Markdown fencing before or after.\n",
               "dynamic": false,
               "part_kind": "instruction"
             }
@@ -160,7 +153,7 @@
             "output_reasoning_tokens": 0
           },
           "model_name": "gpt-4o-mini-2024-07-18",
-          "timestamp": "2026-08-09T03:20:17.860551Z",
+          "timestamp": "2026-08-09T04:09:49.497866Z",
           "kind": "response",
           "provider_name": "openai",
           "provider_url": "https://api.openai.com/v1/",

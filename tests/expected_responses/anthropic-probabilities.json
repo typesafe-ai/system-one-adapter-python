@@ -44,15 +44,15 @@
             "parts": [
               {
                 "content": "Document:\n\"This book was a delight to read.\"",
-                "timestamp": "2026-08-09T03:20:17.871688Z",
+                "timestamp": "2026-08-09T04:09:49.509479Z",
                 "part_kind": "user-prompt"
               }
             ],
-            "timestamp": "2026-08-09T03:20:17.871864Z",
+            "timestamp": "2026-08-09T04:09:49.509632Z",
             "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
             "kind": "request",
-            "run_id": "019fe489-18ce-73f3-9849-adc122e17d15",
-            "conversation_id": "019fe489-18ce-73f3-9849-adc22518e3b6",
+            "run_id": "019fe4b6-70c4-74b7-9a5a-dfa74e9ee433",
+            "conversation_id": "019fe4b6-70c4-74b7-9a5a-dfa8135531a9",
             "metadata": null,
             "state": "complete"
           }
@@ -61,22 +61,11 @@
         "model_request_parameters": {
           "function_tools": [],
           "native_tools": [],
-          "tool_visibility": {},
+          "tool_visibility": null,
           "revealed_tool_names": [],
           "output_mode": "prompted",
           "output_object": {
             "json_schema": {
-              "additionalProperties": false,
-              "properties": {
-                "answers": {
-                  "$ref": "#/$defs/TypeSafeAnswers",
-                  "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key."
-                }
-              },
-              "required": [
-                "answers"
-              ],
-              "type": "object",
               "$defs": {
                 "ChoiceProbabilities2": {
                   "additionalProperties": false,
@@ -98,6 +87,7 @@
                     "fiction",
                     "nonfiction"
                   ],
+                  "title": "ChoiceProbabilities2",
                   "type": "object"
                 },
                 "ScoreProbabilities1": {
@@ -141,6 +131,7 @@
                     "3",
                     "4"
                   ],
+                  "title": "ScoreProbabilities1",
                   "type": "object"
                 },
                 "TypeSafeAnswers": {
@@ -166,26 +157,34 @@
                     "stars",
                     "genre"
                   ],
+                  "title": "TypeSafeAnswers",
                   "type": "object"
                 }
-              }
+              },
+              "additionalProperties": false,
+              "properties": {
+                "answers": {
+                  "$ref": "#/$defs/TypeSafeAnswers",
+                  "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key."
+                }
+              },
+              "required": [
+                "answers"
+              ],
+              "title": "TypeSafeEvaluation",
+              "type": "object"
             },
             "name": "TypeSafeEvaluation",
             "description": null,
-            "strict": false
+            "strict": null
           },
           "output_tools": [],
-          "prompted_output_template": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{schema}\n\nDon't include any text or Markdown fencing before or after.\n",
+          "prompted_output_template": null,
           "allow_text_output": true,
           "allow_image_output": false,
           "instruction_parts": [
             {
               "content": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
-              "dynamic": false,
-              "part_kind": "instruction"
-            },
-            {
-              "content": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{\"additionalProperties\": false, \"properties\": {\"answers\": {\"$ref\": \"#/$defs/TypeSafeAnswers\", \"description\": \"Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.\"}}, \"required\": [\"answers\"], \"type\": \"object\", \"$defs\": {\"ChoiceProbabilities2\": {\"additionalProperties\": false, \"properties\": {\"fiction\": {\"description\": \"A novel or short story.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"nonfiction\": {\"description\": \"A book based on facts, real events, or ideas.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}}, \"required\": [\"fiction\", \"nonfiction\"], \"type\": \"object\"}, \"ScoreProbabilities1\": {\"additionalProperties\": false, \"properties\": {\"0\": {\"description\": \"Horrendous. Unreadable garbage.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"1\": {\"description\": \"Pretty bad, but theoretically readable.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"2\": {\"description\": \"Acceptable, but just barely.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"3\": {\"description\": \"Pretty good. Worth reading but not perfect.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"4\": {\"description\": \"Transcendent and impactful. A must read.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}}, \"required\": [\"0\", \"1\", \"2\", \"3\", \"4\"], \"type\": \"object\"}, \"TypeSafeAnswers\": {\"additionalProperties\": false, \"properties\": {\"positive\": {\"description\": \"The book review is positive.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"stars\": {\"$ref\": \"#/$defs/ScoreProbabilities1\", \"description\": \"Star rating for the book based on the review.\"}, \"genre\": {\"$ref\": \"#/$defs/ChoiceProbabilities2\", \"description\": \"Which genre this review is about.\"}}, \"required\": [\"positive\", \"stars\", \"genre\"], \"type\": \"object\"}}, \"title\": \"TypeSafeEvaluation\"}\n\nDon't include any text or Markdown fencing before or after.\n",
               "dynamic": false,
               "part_kind": "instruction"
             }
@@ -219,7 +218,7 @@
             "cost": null
           },
           "model_name": "claude-haiku-4-5-20251001",
-          "timestamp": "2026-08-09T03:20:17.883233Z",
+          "timestamp": "2026-08-09T04:09:49.520244Z",
           "kind": "response",
           "provider_name": "anthropic",
           "provider_url": "https://api.anthropic.com",
