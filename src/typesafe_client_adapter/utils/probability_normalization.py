@@ -55,13 +55,13 @@ def probability_debug_data(
     return debug_data
 
 
-def to_distribution(probabilities: dict[str, float]) -> dict[str, float]:
+def rescale_probabilities(probabilities: dict[str, float]) -> dict[str, float]:
     """Rescale probabilities to sum to 1, falling back to uniform for a zero total.
 
     Used wherever a value only has meaning over a true distribution (such as a score
     expected value), independent of whether the reported probabilities are normalized.
 
-    :param probabilities: Probabilities keyed by label.
+    :param probabilities: Probabilities keyed by answer.
     :return: Probabilities summing to 1.
     """
     total = sum(probabilities.values())
@@ -69,19 +69,19 @@ def to_distribution(probabilities: dict[str, float]) -> dict[str, float]:
         uniform_probability = 1.0 / len(probabilities)
         return dict.fromkeys(probabilities, uniform_probability)
     return {
-        label: probability / total for label, probability in probabilities.items()
+        answer: probability / total for answer, probability in probabilities.items()
     }
 
 
-def normalize_probabilities(
-    labels: list[str],
+def normalize_probabilities_of_all_answers(
+    answers: list[str],
     value: Any,
     answer_mode: AnswerMode,
     enabled: bool,
 ) -> ProbabilityNormalization:
     """Build and optionally normalize a probability distribution.
 
-    :param labels: Ordered distribution labels.
+    :param answers: Ordered possible answers.
     :param value: LLM answer value.
     :param answer_mode: Probability or discrete LLM answer mode.
     :param enabled: Whether to normalize invalid distributions.
@@ -89,14 +89,14 @@ def normalize_probabilities(
     """
     if answer_mode == "discrete":
         selected = str(value)
-        probabilities = {label: float(label == selected) for label in labels}
+        probabilities = {answer: float(answer == selected) for answer in answers}
         return ProbabilityNormalization(probabilities)
 
-    original_probabilities = {label: float(value[label]) for label in labels}
+    original_probabilities = {answer: float(value[answer]) for answer in answers}
     total = sum(original_probabilities.values())
     error = abs(total - 1.0)
     if not enabled or error <= PROBABILITY_TOLERANCE:
         return ProbabilityNormalization(original_probabilities, error)
 
-    probabilities = to_distribution(original_probabilities)
+    probabilities = rescale_probabilities(original_probabilities)
     return ProbabilityNormalization(probabilities, error, original_probabilities)

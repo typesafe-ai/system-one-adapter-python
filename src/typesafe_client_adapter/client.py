@@ -43,9 +43,9 @@ from typesafe_client_adapter.utils.model_request_debug import (
 from typesafe_client_adapter.utils.probability_normalization import (
     AnswerMode,
     ProbabilityNormalization,
-    normalize_probabilities,
+    normalize_probabilities_of_all_answers,
     probability_debug_data,
-    to_distribution,
+    rescale_probabilities,
 )
 from typesafe_client_adapter.utils.pydantic_utils import (
     Question,
@@ -77,9 +77,9 @@ def _convert_llm_value_to_typesafe_answer(
         return NoulAnswer(type=QuestionType.Noul, noul=probability), None
 
     if isinstance(question, ScoreQuestion):
-        labels = [str(score) for score in range(len(question.criteria))]
-        probability_normalization = normalize_probabilities(
-            labels,
+        answers = [str(score) for score in range(len(question.criteria))]
+        probability_normalization = normalize_probabilities_of_all_answers(
+            answers,
             value,
             llm_answer_mode,
             should_normalize_probabilities,
@@ -88,9 +88,9 @@ def _convert_llm_value_to_typesafe_answer(
         # The score is an expected value, so it is only meaningful over a distribution
         # summing to 1. Normalize explicitly here: the reported probabilities are left
         # untouched when ``normalize_probabilities`` is disabled.
-        score_distribution = to_distribution(probabilities)
+        score_distribution = rescale_probabilities(probabilities)
         score = sum(
-            index * score_distribution[str(index)] for index in range(len(labels))
+            index * score_distribution[str(index)] for index in range(len(answers))
         )
         answer = ScoreAnswer(
             type=QuestionType.Score,
@@ -100,15 +100,15 @@ def _convert_llm_value_to_typesafe_answer(
         )
         return answer, probability_normalization
 
-    labels = list(question.criteria)
-    probability_normalization = normalize_probabilities(
-        labels,
+    answers = list(question.criteria)
+    probability_normalization = normalize_probabilities_of_all_answers(
+        answers,
         value,
         llm_answer_mode,
         should_normalize_probabilities,
     )
     probabilities = probability_normalization.probabilities
-    choice = max(labels, key=probabilities.__getitem__)
+    choice = max(answers, key=probabilities.__getitem__)
     answer = ChoiceAnswer(
         type=QuestionType.Choice,
         choice=choice,

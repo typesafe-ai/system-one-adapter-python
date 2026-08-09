@@ -3,7 +3,7 @@
 import pytest
 
 from typesafe_client_adapter.utils.probability_normalization import (
-    normalize_probabilities,
+    normalize_probabilities_of_all_answers,
     probability_debug_data,
 )
 
@@ -50,13 +50,13 @@ def test_probability_normalization_and_debug_data(
 ):
     probability_normalizations = {
         "positive": None,
-        "stars": normalize_probabilities(
+        "stars": normalize_probabilities_of_all_answers(
             ["0", "1"],
             {"0": raw_probability, "1": raw_probability},
             "probabilities",
             normalization_enabled,
         ),
-        "genre": normalize_probabilities(
+        "genre": normalize_probabilities_of_all_answers(
             ["fiction", "nonfiction"],
             {"fiction": raw_probability, "nonfiction": raw_probability},
             "probabilities",
