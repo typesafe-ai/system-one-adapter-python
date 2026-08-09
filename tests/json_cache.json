@@ -1,42 +1,45 @@
 {
-  "2b1ea1917e13828be8876011189b815c9a692b165a352791f288ac338d36527a": {
+  "c4e1ed32339980d2b10d3a52515a8dde6013295775f9d43520526847c705bcec": {
     "answers": {
       "genre": {
         "choice": "fiction",
-        "confidence": 1.0,
+        "confidence": 0.64,
         "probabilities": {
-          "fiction": 1.0,
-          "nonfiction": 0.0
+          "fiction": 0.82,
+          "nonfiction": 0.18
         },
         "type": "choice"
       },
       "positive": {
-        "noul": 1.0,
+        "noul": 0.96,
         "type": "noul"
       },
       "stars": {
-        "confidence": 1.0,
+        "confidence": 0.55,
         "probabilities": {
-          "0": 0.0,
-          "1": 0.0,
-          "2": 0.0,
-          "3": 0.0,
-          "4": 1.0
+          "0": 0.01,
+          "1": 0.02,
+          "2": 0.07,
+          "3": 0.3,
+          "4": 0.6
         },
-        "score": 4.0,
+        "score": 3.46,
         "type": "score"
       }
     },
     "model": "gpt-4o-mini",
     "usage": {
-      "input_tokens": 331,
-      "latency": 0.51,
+      "input_tokens": 356,
+      "invalid_probs": 0,
+      "latency": 0.74,
+      "max_error": 0.0,
       "n_retries": 0,
       "n_retries_malformed_structure": 0,
-      "output_tokens": 29
+      "output_tokens": 91,
+      "probability_errors": {}
     }
   },
-  "0b8f036b9ea44b4fc1237a9d8fb49c8f4bb191d810e4c7db03a7651eb1a609ba": {
+  "d03de61e95c9b7e107764be8c7f4aa90fba7d40a5e0b6f09800280fe94b34979": {
     "answers": {
       "genre": {
         "choice": "fiction",
@@ -67,10 +70,93 @@
     "model": "claude-haiku-4-5",
     "usage": {
       "input_tokens": 382,
+      "invalid_probs": 0,
       "latency": 0.79,
+      "max_error": 0.0,
       "n_retries": 0,
       "n_retries_malformed_structure": 0,
-      "output_tokens": 31
+      "output_tokens": 31,
+      "probability_errors": {}
+    }
+  },
+  "c3f03d0b43232c8f7bc5d1c776259b2ac3183927cf5427bd97f271b15674b135": {
+    "answers": {
+      "genre": {
+        "choice": "fiction",
+        "confidence": 1.0,
+        "probabilities": {
+          "fiction": 1.0,
+          "nonfiction": 0.0
+        },
+        "type": "choice"
+      },
+      "positive": {
+        "noul": 1.0,
+        "type": "noul"
+      },
+      "stars": {
+        "confidence": 1.0,
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0,
+          "4": 1.0
+        },
+        "score": 4.0,
+        "type": "score"
+      }
+    },
+    "model": "gpt-4o-mini",
+    "usage": {
+      "input_tokens": 331,
+      "invalid_probs": 0,
+      "latency": 0.51,
+      "max_error": 0.0,
+      "n_retries": 0,
+      "n_retries_malformed_structure": 0,
+      "output_tokens": 29,
+      "probability_errors": {}
+    }
+  },
+  "d5fba465f165a26b443f6566f524b3b918a3dd8ee9fba437bf1a12a87effdb4b": {
+    "answers": {
+      "genre": {
+        "choice": "fiction",
+        "confidence": 0.52,
+        "probabilities": {
+          "fiction": 0.76,
+          "nonfiction": 0.24
+        },
+        "type": "choice"
+      },
+      "positive": {
+        "noul": 0.94,
+        "type": "noul"
+      },
+      "stars": {
+        "confidence": 0.3583333333333333,
+        "probabilities": {
+          "0": 0.02,
+          "1": 0.03,
+          "2": 0.1,
+          "3": 0.4,
+          "4": 0.45
+        },
+        "score": 3.23,
+        "type": "score"
+      }
+    },
+    "model": "claude-haiku-4-5",
+    "usage": {
+      "input_tokens": 411,
+      "invalid_probs": 0,
+      "latency": 1.08,
+      "max_error": 0.0,
+      "n_retries": 0,
+      "n_retries_malformed_structure": 0,
+      "output_tokens": 104,
+      "probability_errors": {}
     }
   },
   "c6ed64efdabba2f023fd4af0e49f75acd6590b905eab4758152e655f2f3805ad": {
@@ -89,7 +175,7 @@
         "type": "noul"
       },
       "stars": {
-        "confidence": 0.625,
+        "confidence": 0.6958333333333333,
         "probabilities": {
           "0": 0.005,
           "1": 0.005,
@@ -105,80 +191,6 @@
     "usage": {
       "input_tokens": 287,
       "output_tokens": 47
-    }
-  },
-  "3e6392c8ab7fad293c8294bd97d3d5e45a559c90c0798509bcf7711240cfee47": {
-    "answers": {
-      "genre": {
-        "choice": "fiction",
-        "confidence": 0.52,
-        "probabilities": {
-          "fiction": 0.76,
-          "nonfiction": 0.24
-        },
-        "type": "choice"
-      },
-      "positive": {
-        "noul": 0.94,
-        "type": "noul"
-      },
-      "stars": {
-        "confidence": 0.3125,
-        "probabilities": {
-          "0": 0.02,
-          "1": 0.03,
-          "2": 0.1,
-          "3": 0.4,
-          "4": 0.45
-        },
-        "score": 3.23,
-        "type": "score"
-      }
-    },
-    "model": "claude-haiku-4-5",
-    "usage": {
-      "input_tokens": 411,
-      "latency": 1.08,
-      "n_retries": 0,
-      "n_retries_malformed_structure": 0,
-      "output_tokens": 104
-    }
-  },
-  "03280c8127b8765818b9d4b9c72b7e9147b39aa7852f846fecd5fbcd8fd80e80": {
-    "answers": {
-      "genre": {
-        "choice": "fiction",
-        "confidence": 0.64,
-        "probabilities": {
-          "fiction": 0.82,
-          "nonfiction": 0.18
-        },
-        "type": "choice"
-      },
-      "positive": {
-        "noul": 0.96,
-        "type": "noul"
-      },
-      "stars": {
-        "confidence": 0.5,
-        "probabilities": {
-          "0": 0.01,
-          "1": 0.02,
-          "2": 0.07,
-          "3": 0.3,
-          "4": 0.6
-        },
-        "score": 3.46,
-        "type": "score"
-      }
-    },
-    "model": "gpt-4o-mini",
-    "usage": {
-      "input_tokens": 356,
-      "latency": 0.74,
-      "n_retries": 0,
-      "n_retries_malformed_structure": 0,
-      "output_tokens": 91
     }
   }
 }

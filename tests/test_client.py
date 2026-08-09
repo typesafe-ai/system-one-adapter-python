@@ -15,6 +15,10 @@ from typesafe_client.api.api_client import (
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
 from open_typesafe_client import OpenTypeSafeClient
+from open_typesafe_client.utils.confidence_metrics import (
+    choice_confidence,
+    score_confidence,
+)
 
 QUESTIONS = {
     "positive": NoulQuestion(instructions="The review is positive."),
@@ -28,6 +32,21 @@ QUESTIONS = {
 
 def test_client_is_typesafe_client():
     assert issubclass(OpenTypeSafeClient, TypeSafeClient)
+
+
+@pytest.mark.parametrize(
+    ("confidence_metric", "probabilities", "expected_confidence"),
+    [
+        (score_confidence, [0.2] * 5, 0.0),
+        (score_confidence, [0.01, 0.02, 0.07, 0.3, 0.6], 0.55),
+        (choice_confidence, [0.5, 0.5], 0.0),
+        (choice_confidence, [0.82, 0.18], 0.64),
+        (score_confidence, [1.0], 1.0),
+        (choice_confidence, [1.0], 1.0),
+    ],
+)
+def test_confidence_metrics(confidence_metric, probabilities, expected_confidence):
+    assert confidence_metric(probabilities) == pytest.approx(expected_confidence)
 
 
 def model_response(response_data, expected_output_mode):
@@ -76,9 +95,7 @@ def model_response(response_data, expected_output_mode):
 def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     client = OpenTypeSafeClient(
         structured_outputs=structured_outputs,
-        noul_mode=answer_mode,
-        score_mode=answer_mode,
-        choice_mode=answer_mode,
+        llm_answer_mode=answer_mode,
     )
     expected_output_mode = "native" if structured_outputs else "prompted"
     model = model_response(response_data, expected_output_mode)
@@ -113,6 +130,68 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert response.usage.n_retries == 0
     assert response.usage.n_retries_malformed_structure == 0
     assert response.usage.latency >= 0
+    assert response.usage.max_error == 0
+    assert response.usage.invalid_probs == 0
+    assert response.usage.probability_errors == {}
+
+
+@pytest.mark.parametrize(
+    ("normalize_probabilities", "expected_answers", "expected_originals"),
+    [
+        (
+            False,
+            {
+                "positive": 0.8,
+                "stars": {"0": 0.2, "1": 0.2},
+                "genre": {"fiction": 0.8, "nonfiction": 0.8},
+            },
+            None,
+        ),
+        (
+            True,
+            {
+                "positive": 0.8,
+                "stars": {"0": 0.5, "1": 0.5},
+                "genre": {"fiction": 0.5, "nonfiction": 0.5},
+            },
+            {
+                "stars": {"0": 0.2, "1": 0.2},
+                "genre": {"fiction": 0.8, "nonfiction": 0.8},
+            },
+        ),
+    ],
+)
+def test_probability_validation(
+    normalize_probabilities,
+    expected_answers,
+    expected_originals,
+):
+    response_data = {
+        "answers": {
+            "positive": 0.8,
+            "stars": {"0": 0.2, "1": 0.2},
+            "genre": {"fiction": 0.8, "nonfiction": 0.8},
+        }
+    }
+    response = OpenTypeSafeClient(
+        normalize_probabilities=normalize_probabilities
+    ).system_one(model_response(response_data, "prompted"), "document", QUESTIONS)
+
+    assert response.answers["positive"].noul == pytest.approx(
+        expected_answers["positive"]
+    )
+    assert response.answers["stars"].probabilities == pytest.approx(
+        expected_answers["stars"]
+    )
+    assert response.answers["genre"].probabilities == pytest.approx(
+        expected_answers["genre"]
+    )
+    assert response.usage.max_error == pytest.approx(0.6)
+    assert response.usage.invalid_probs == 2
+    assert response.usage.probability_errors == pytest.approx(
+        {"stars": 0.6, "genre": 0.6}
+    )
+    assert getattr(response.usage, "original_probabilities", None) == expected_originals
 
 
 @pytest.mark.parametrize(
@@ -170,9 +249,9 @@ def test_malformed_structure_is_retried():
     def respond(messages, agent_info):
         nonlocal calls
         calls += 1
-        noul = 2.0 if calls == 1 else 0.75
+        answers = {} if calls == 1 else {"answer": 0.75}
         return ModelResponse(
-            [TextPart(json.dumps({"answers": {"answer": noul}}))],
+            [TextPart(json.dumps({"answers": answers}))],
             usage=RequestUsage(input_tokens=11, output_tokens=7),
         )
 

@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Erik Gafni", email = "erik@typesafe.ai" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.121.0",
     "openai>=2.53.0",
@@ -26,6 +26,9 @@ url = "https://pypi.typesafe.ai/"
 
 [tool.uv.build-backend]
 module-name = "open_typesafe_client"
+
+[tool.ruff]
+target-version = "py311"
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]

@@ -47,13 +47,92 @@ llm_response = open_typesafe_client.system_one("gpt-4o-mini", document, question
 typesafe_response = typesafe_client.system_one("speed_latest", document, questions)
 
 # llm_response will have a nearly identical shape to typesafe_response
-print(llm_response)
-print(typesafe_response)
+print(llm_response.model_dump_json(indent=2))
+print(typesafe_response.model_dump_json(indent=2))
 ```
 
-```text
-model='gpt-4o-mini' answers={'genre': ChoiceAnswer(type=<QuestionType.Choice: 'choice'>, choice='fiction', confidence=0.64, probabilities={'fiction': 0.82, 'nonfiction': 0.18}), 'positive': NoulAnswer(type=<QuestionType.Noul: 'noul'>, noul=0.96), 'stars': ScoreAnswer(type=<QuestionType.Score: 'score'>, score=3.46, confidence=0.5, probabilities={'0': 0.01, '1': 0.02, '2': 0.07, '3': 0.3, '4': 0.6})} usage=Usage(input_tokens=356, output_tokens=91, latency=0.74, n_retries=0, n_retries_malformed_structure=0)
-model='speed_latest' answers={'genre': ChoiceAnswer(type=<QuestionType.Choice: 'choice'>, choice='fiction', confidence=0.76, probabilities={'fiction': 0.88, 'nonfiction': 0.12}), 'positive': NoulAnswer(type=<QuestionType.Noul: 'noul'>, noul=0.98), 'stars': ScoreAnswer(type=<QuestionType.Score: 'score'>, score=3.635, confidence=0.625, probabilities={'0': 0.005, '1': 0.005, '2': 0.04, '3': 0.25, '4': 0.7})} usage=Usage(input_tokens=287, output_tokens=47)
+LLM response:
+
+```json
+{
+  "model": "gpt-4o-mini",
+  "answers": {
+    "positive": {
+      "type": "noul",
+      "noul": 0.96
+    },
+    "stars": {
+      "type": "score",
+      "score": 3.46,
+      "confidence": 0.55,
+      "probabilities": {
+        "0": 0.01,
+        "1": 0.02,
+        "2": 0.07,
+        "3": 0.3,
+        "4": 0.6
+      }
+    },
+    "genre": {
+      "type": "choice",
+      "choice": "fiction",
+      "confidence": 0.64,
+      "probabilities": {
+        "fiction": 0.82,
+        "nonfiction": 0.18
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 356,
+    "output_tokens": 91,
+    "n_retries": 0,
+    "n_retries_malformed_structure": 0,
+    "latency": 0.74,
+    "max_error": 0.0,
+    "invalid_probs": 0,
+    "probability_errors": {}
+  }
+}
+```
+
+TypeSafe response:
+
+```json
+{
+  "model": "speed_latest",
+  "answers": {
+    "positive": {
+      "type": "noul",
+      "noul": 0.98
+    },
+    "stars": {
+      "type": "score",
+      "score": 3.635,
+      "confidence": 0.6958333333333333,
+      "probabilities": {
+        "0": 0.005,
+        "1": 0.005,
+        "2": 0.04,
+        "3": 0.25,
+        "4": 0.7
+      }
+    },
+    "genre": {
+      "type": "choice",
+      "choice": "fiction",
+      "confidence": 0.76,
+      "probabilities": {
+        "fiction": 0.88,
+        "nonfiction": 0.12
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 287,
+    "output_tokens": 47
+  }
+}
 ```
 
 # Specification
@@ -69,6 +148,13 @@ model='speed_latest' answers={'genre': ChoiceAnswer(type=<QuestionType.Choice: '
   - `n_retries` counts retries of transient provider failures
   - `n_retries_malformed_structure` counts PydanticAI corrective retries for malformed output
   - `latency` is end-to-end request latency in seconds, including retries
+  - `max_error` is the largest probability distribution-sum error
+  - `invalid_probs` counts answers whose probability error exceeds `1e-6`
+  - `probability_errors` maps invalid question IDs to their errors
+  - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
+- Probability normalization
+  - `normalize_probabilities=False` preserves LLM probabilities and only reports errors
+  - `normalize_probabilities=True` renormalizes score and choice distributions
 - Retry distinction
   - `retry` configures retries for transient connection, timeout, and retryable HTTP failures
   - `n_retry_malformed_structure` configures corrective retries for output that fails structural validation
@@ -90,9 +176,8 @@ class OpenTypeSafeClient(TypeSafeClient):
    def __init__(
       self, 
       structured_outputs: bool = False,
-      noul_mode: Literal['probabilities','discrete']="probabilities",
-      score_mode: Literal['probabilities','discrete']="probabilities",
-      choice_mode: Literal['probabilities','discrete']="probabilities",
+      llm_answer_mode: Literal['probabilities','discrete']="probabilities",
+      normalize_probabilities: bool = False,
       n_retry_malformed_structure: int = 0,
       retry: RetryConfig = NoRetries(),
   ):

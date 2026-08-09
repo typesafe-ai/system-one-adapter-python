@@ -8,7 +8,7 @@ from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
 from open_typesafe_client import OpenTypeSafeClient
-from open_typesafe_client.json_cache import JsonCache
+from open_typesafe_client.utils.json_cache import JsonCache
 
 JSON_CACHE_PATH = Path(__file__).with_name("json_cache.json")
 if "REGENERATE_JSON_CACHE" in os.environ:
@@ -50,7 +50,7 @@ QUESTIONS = {
                     "stars": {
                         "type": "score",
                         "score": 3.46,
-                        "confidence": 0.5,
+                        "confidence": 0.55,
                         "probabilities": {
                             "0": 0.01,
                             "1": 0.02,
@@ -72,16 +72,15 @@ QUESTIONS = {
                     "n_retries": 0,
                     "n_retries_malformed_structure": 0,
                     "latency": 0.74,
+                    "max_error": 0.0,
+                    "invalid_probs": 0,
+                    "probability_errors": {},
                 },
             },
             id="openai-probabilities",
         ),
         pytest.param(
-            OpenTypeSafeClient(
-                noul_mode="discrete",
-                score_mode="discrete",
-                choice_mode="discrete",
-            ),
+            OpenTypeSafeClient(llm_answer_mode="discrete"),
             "gpt-4o-mini",
             {
                 "model": "gpt-4o-mini",
@@ -112,6 +111,9 @@ QUESTIONS = {
                     "n_retries": 0,
                     "n_retries_malformed_structure": 0,
                     "latency": 0.51,
+                    "max_error": 0.0,
+                    "invalid_probs": 0,
+                    "probability_errors": {},
                 },
             },
             id="openai-discrete",
@@ -126,7 +128,7 @@ QUESTIONS = {
                     "stars": {
                         "type": "score",
                         "score": 3.23,
-                        "confidence": 0.3125,
+                        "confidence": 0.3583333333333333,
                         "probabilities": {
                             "0": 0.02,
                             "1": 0.03,
@@ -148,16 +150,15 @@ QUESTIONS = {
                     "n_retries": 0,
                     "n_retries_malformed_structure": 0,
                     "latency": 1.08,
+                    "max_error": 0.0,
+                    "invalid_probs": 0,
+                    "probability_errors": {},
                 },
             },
             id="anthropic-probabilities",
         ),
         pytest.param(
-            OpenTypeSafeClient(
-                noul_mode="discrete",
-                score_mode="discrete",
-                choice_mode="discrete",
-            ),
+            OpenTypeSafeClient(llm_answer_mode="discrete"),
             "claude-haiku-4-5",
             {
                 "model": "claude-haiku-4-5",
@@ -188,6 +189,9 @@ QUESTIONS = {
                     "n_retries": 0,
                     "n_retries_malformed_structure": 0,
                     "latency": 0.79,
+                    "max_error": 0.0,
+                    "invalid_probs": 0,
+                    "probability_errors": {},
                 },
             },
             id="anthropic-discrete",
@@ -202,7 +206,7 @@ QUESTIONS = {
                     "stars": {
                         "type": "score",
                         "score": 3.635,
-                        "confidence": 0.625,
+                        "confidence": 0.6958333333333333,
                         "probabilities": {
                             "0": 0.005,
                             "1": 0.005,
