@@ -6,8 +6,8 @@ import functools
 import hashlib
 import json
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 MAX_KEY_CHARS = (
     200  # keys longer than this (e.g. whole documents) are stored as a sha256 digest
@@ -17,9 +17,9 @@ MAX_KEY_CHARS = (
 class JsonCache:
     """Memoize a function's JSON-serializable results to a single JSON file.
 
-    Keys are the function name and ``|``-joined args (and sorted kwargs), so one instance can
-    decorate several functions sharing one file; keys longer than ``MAX_KEY_CHARS`` are replaced
-    by their sha256 digest so long prompts/documents don't bloat the file.
+    Keys include the qualified function name, public bound-instance state, and ``|``-joined
+    arguments, so configured clients and functions can share one file. Keys longer than
+    ``MAX_KEY_CHARS`` are replaced by their sha256 digest.
 
     >>> cache = JsonCache(Path(__file__).with_name("json_cache.json"))
     >>> @cache
@@ -36,8 +36,18 @@ class JsonCache:
     def __call__(self, fn: Callable) -> Callable:
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
+            bound_instance = getattr(fn, "__self__", None)
+            public_state = (
+                {
+                    name: value
+                    for name, value in vars(bound_instance).items()
+                    if not name.startswith("_")
+                }
+                if bound_instance is not None
+                else {}
+            )
             key = "|".join(
-                [fn.__name__]
+                [f"{fn.__module__}.{fn.__qualname__}", str(public_state)]
                 + [str(a) for a in args]
                 + [f"{k}={v}" for k, v in sorted(kwargs.items())]
             )
@@ -45,6 +55,9 @@ class JsonCache:
                 key = hashlib.sha256(key.encode()).hexdigest()
             if key not in self._data:
                 result = fn(*args, **kwargs)
+                model_dump = getattr(result, "model_dump", None)
+                if callable(model_dump):
+                    result = model_dump(mode="json")
                 with self._lock:
                     self._data[key] = result
                     self.path.write_text(

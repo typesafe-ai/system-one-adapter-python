@@ -1,0 +1,188 @@
+"""End-to-end client tests through PydanticAI's model interface."""
+
+import asyncio
+import json
+
+import pytest
+from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
+from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.usage import RequestUsage
+from typesafe_client import RetryConfig, TypeSafeClient
+from typesafe_client.api.api_client import (
+    TypeSafeAuthError,
+    TypeSafeTokensExceededError,
+)
+from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
+
+from open_typesafe_client import OpenTypeSafeClient
+
+QUESTIONS = {
+    "positive": NoulQuestion(instructions="The review is positive."),
+    "stars": ScoreQuestion(instructions="Rating.", criteria=["Bad.", "Good."]),
+    "genre": ChoiceQuestion(
+        instructions="Genre.",
+        criteria={"fiction": "A story.", "nonfiction": "Facts."},
+    ),
+}
+
+
+def test_client_is_typesafe_client():
+    assert issubclass(OpenTypeSafeClient, TypeSafeClient)
+
+
+def model_response(response_data, expected_output_mode):
+    """Return a local model producing ``response_data`` in the requested output mode."""
+
+    def respond(messages, agent_info):
+        parameters = agent_info.model_request_parameters
+        assert parameters.output_mode == expected_output_mode
+        if not agent_info.output_tools:
+            parts = [TextPart(json.dumps(response_data))]
+        else:
+            parts = [ToolCallPart(agent_info.output_tools[0].name, response_data)]
+        return ModelResponse(
+            parts,
+            usage=RequestUsage(input_tokens=11, output_tokens=7),
+        )
+
+    return FunctionModel(
+        respond,
+        model_name="test-model",
+        profile={"supports_json_schema_output": True},
+    )
+
+
+@pytest.mark.parametrize("structured_outputs", [False, True])
+@pytest.mark.parametrize("async_call", [False, True])
+@pytest.mark.parametrize(
+    ("answer_mode", "response_data"),
+    [
+        (
+            "probabilities",
+            {
+                "answers": {
+                    "positive": 0.8,
+                    "stars": {"0": 0.1, "1": 0.9},
+                    "genre": {"fiction": 0.5, "nonfiction": 0.5},
+                }
+            },
+        ),
+        (
+            "discrete",
+            {"answers": {"positive": True, "stars": 1, "genre": "fiction"}},
+        ),
+    ],
+)
+def test_system_one(answer_mode, response_data, async_call, structured_outputs):
+    client = OpenTypeSafeClient(
+        structured_outputs=structured_outputs,
+        noul_mode=answer_mode,
+        score_mode=answer_mode,
+        choice_mode=answer_mode,
+    )
+    expected_output_mode = "native" if structured_outputs else "prompted"
+    model = model_response(response_data, expected_output_mode)
+
+    if async_call:
+        response = asyncio.run(
+            client.system_one_async(model, "A delightful novel.", QUESTIONS)
+        )
+    else:
+        response = client.system_one(model, "A delightful novel.", QUESTIONS)
+
+    assert response.model == "test-model"
+    assert response.answers["positive"].type == "noul"
+    assert response.answers["positive"].noul == pytest.approx(
+        0.8 if answer_mode == "probabilities" else 1.0
+    )
+    assert response.answers["stars"].score == pytest.approx(
+        0.9 if answer_mode == "probabilities" else 1.0
+    )
+    assert response.answers["stars"].confidence == pytest.approx(
+        0.8 if answer_mode == "probabilities" else 1.0
+    )
+    assert response.answers["genre"].choice == "fiction"
+    assert response.answers["genre"].confidence == pytest.approx(
+        0.0 if answer_mode == "probabilities" else 1.0
+    )
+    assert response.answers["stars"].probabilities == pytest.approx(
+        {"0": 0.1, "1": 0.9} if answer_mode == "probabilities" else {"0": 0.0, "1": 1.0}
+    )
+    assert response.usage.input_tokens == 11
+    assert response.usage.output_tokens == 7
+    assert response.usage.n_retries == 0
+    assert response.usage.n_retries_malformed_structure == 0
+    assert response.usage.latency >= 0
+
+
+@pytest.mark.parametrize(
+    ("status_code", "body", "error_type"),
+    [
+        (401, {"message": "bad key"}, TypeSafeAuthError),
+        (400, {"message": "context_length_exceeded"}, TypeSafeTokensExceededError),
+    ],
+)
+def test_provider_errors(status_code, body, error_type):
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    def fail(messages, agent_info):
+        raise ModelHTTPError(status_code, "test-model", body)
+
+    model = FunctionModel(fail, model_name="test-model")
+
+    with pytest.raises(error_type):
+        OpenTypeSafeClient().system_one(
+            model, "document", {"answer": QUESTIONS["positive"]}
+        )
+
+
+def test_transient_errors_are_retried():
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    calls = 0
+    success_model = model_response(
+        {"answers": {"answer": 0.75}}, expected_output_mode="prompted"
+    )
+
+    def respond(messages, agent_info):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise ModelHTTPError(503, "test-model", {"message": "unavailable"})
+        return success_model.function(messages, agent_info)
+
+    model = FunctionModel(respond, model_name="test-model")
+    retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
+    response = OpenTypeSafeClient(retry=retry).system_one(
+        model,
+        "document",
+        {"answer": QUESTIONS["positive"]},
+    )
+
+    assert calls == 2
+    assert response.usage.n_retries == 1
+    assert response.usage.n_retries_malformed_structure == 0
+
+
+def test_malformed_structure_is_retried():
+    calls = 0
+
+    def respond(messages, agent_info):
+        nonlocal calls
+        calls += 1
+        noul = 2.0 if calls == 1 else 0.75
+        return ModelResponse(
+            [TextPart(json.dumps({"answers": {"answer": noul}}))],
+            usage=RequestUsage(input_tokens=11, output_tokens=7),
+        )
+
+    model = FunctionModel(respond, model_name="test-model")
+    response = OpenTypeSafeClient(n_retry_malformed_structure=1).system_one(
+        model,
+        "document",
+        {"answer": QUESTIONS["positive"]},
+    )
+
+    assert calls == 2
+    assert response.usage.n_retries == 0
+    assert response.usage.n_retries_malformed_structure == 1

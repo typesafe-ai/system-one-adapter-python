@@ -14,9 +14,18 @@ dependencies = [
     "typesafe-client>=1.0.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.14.14",
+]
+
 [[tool.uv.index]]
 name = "typesafe"
 url = "https://pypi.typesafe.ai/"
+
+[tool.uv.build-backend]
+module-name = "open_typesafe_client"
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]
