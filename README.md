@@ -252,9 +252,7 @@ replayed_response = asyncio.run(
 )
 ```
 
-Use the original model instance instead of `infer_model()` when the call used a
-configured model or custom provider. Repeating a request does not guarantee identical
-nondeterministic model output.
+Repeating a request does not guarantee identical nondeterministic model output.
 
 class TypeSafeClientAdapter(TypeSafeClient):
    def __init__(
