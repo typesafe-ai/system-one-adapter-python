@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic_ai import ModelMessagesTypeAdapter, RunContext
+from pydantic_ai import RunContext
 from pydantic_ai.capabilities import Hooks, WrapModelRequestHandler
 from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models import ModelRequestContext
-from pydantic_core import to_jsonable_python
 
 
 def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
@@ -31,30 +30,15 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
         :param handler: Function performing the model request.
         :return: Unchanged model response.
         """
-        model_settings, model_request_parameters = (
-            request_context.model.prepare_request(
-                request_context.model_settings,
-                request_context.model_request_parameters,
-            )
-        )
         request_debug_info = {
             "model_name": request_context.model.model_name,
             "model_id": request_context.model.model_id,
             "provider": request_context.model.system,
         }
         llm_query = {
-            "messages": ModelMessagesTypeAdapter.dump_python(
-                request_context.messages,
-                mode="json",
-            ),
-            "model_settings": to_jsonable_python(
-                model_settings,
-                serialize_unknown=True,
-            ),
-            "model_request_parameters": to_jsonable_python(
-                model_request_parameters,
-                serialize_unknown=True,
-            ),
+            "messages": request_context.messages,
+            "model_settings": request_context.model_settings,
+            "model_request_parameters": request_context.model_request_parameters,
             "llm_response": None,
             "debug_info": request_debug_info,
         }
@@ -71,11 +55,8 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
             )
             raise
 
-        llm_query["llm_response"] = ModelMessagesTypeAdapter.dump_python(
-            [model_response],
-            mode="json",
-        )[0]
+        llm_query["llm_response"] = model_response
         request_debug_info["finish_reason"] = model_response.finish_reason
         return model_response
 
-    return Hooks(model_request=capture_model_request), {"llm_queries": llm_queries}
+    return Hooks(model_request=capture_model_request), {"llm_attempts": llm_queries}

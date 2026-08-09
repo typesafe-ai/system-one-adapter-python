@@ -43,6 +43,20 @@ def model_response(response_data, expected_output_mode, expected_descriptions=()
     def return_configured_model_response(messages, agent_info):
         parameters = agent_info.model_request_parameters
         assert parameters.output_mode == expected_output_mode
+        prompted_output_instructions = parameters.prompted_output_instructions
+        if expected_output_mode == "prompted":
+            assert prompted_output_instructions, (
+                "Prompted output mode requires output instructions"
+            )
+            assert (
+                sum(
+                    instruction_part.content == prompted_output_instructions
+                    for instruction_part in parameters.instruction_parts or []
+                )
+                == 1
+            )
+        else:
+            assert prompted_output_instructions is None
         output_schema = parameters.output_object.json_schema
         for expected_description in expected_descriptions:
             assert expected_description in json.dumps(output_schema)
@@ -141,21 +155,33 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert response.debug["invalid_probs"] == 0
     assert response.debug["probability_errors"] == {}
 
-    llm_query = response.debug["llm_queries"][0]
+    llm_query = response.debug["llm_attempts"][0]
     llm_response = llm_query["llm_response"]
-    serialized_query = json.dumps(llm_query)
+    serialized_llm_attempt = response.model_dump(mode="json")["debug"][
+        "llm_attempts"
+    ][0]
+    serialized_query = json.dumps(serialized_llm_attempt)
     assert "Evaluate every question" in serialized_query
     assert "A delightful novel." in serialized_query
-    assert llm_query["messages"][-1]["kind"] == "request"
-    model_request_parameters = llm_query["model_request_parameters"]
+    assert llm_query["messages"][-1].kind == "request"
+    model_request_parameters = serialized_llm_attempt["model_request_parameters"]
     assert model_request_parameters["output_mode"] == expected_output_mode
     assert "positive" in json.dumps(model_request_parameters["output_object"])
-    assert llm_response["kind"] == "response"
+    assert isinstance(llm_response, ModelResponse)
     restored_messages = ModelMessagesTypeAdapter.validate_python(
-        [*llm_query["messages"], llm_response]
+        [*serialized_llm_attempt["messages"], serialized_llm_attempt["llm_response"]]
     )
     assert len(restored_messages) == 2
     assert llm_query["debug_info"]["model_name"] == "test-model"
+
+    replayed_response = asyncio.run(
+        model.request(
+            llm_query["messages"],
+            llm_query["model_settings"],
+            llm_query["model_request_parameters"],
+        )
+    )
+    assert replayed_response.parts == restored_messages[-1].parts
 
 
 @pytest.mark.parametrize(
@@ -246,12 +272,16 @@ def test_transient_errors_are_retried(async_call):
     assert calls == 2
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 0
-    assert len(response.debug["llm_queries"]) == 2
-    assert response.debug["llm_queries"][0]["llm_response"] is None
+    assert len(response.debug["llm_attempts"]) == 2
+    assert response.debug["llm_attempts"][0]["llm_response"] is None
     assert (
-        response.debug["llm_queries"][0]["debug_info"]["error_type"] == "ModelHTTPError"
+        response.debug["llm_attempts"][0]["debug_info"]["error_type"]
+        == "ModelHTTPError"
     )
-    assert response.debug["llm_queries"][1]["llm_response"]["kind"] == "response"
+    assert isinstance(
+        response.debug["llm_attempts"][1]["llm_response"],
+        ModelResponse,
+    )
 
 
 @pytest.mark.parametrize("async_call", [False, True])
@@ -318,7 +348,7 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
     assert response.usage.output_tokens == 100
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 1
-    assert len(response.debug["llm_queries"]) == 3
+    assert len(response.debug["llm_attempts"]) == 3
 
 
 @pytest.mark.parametrize(
@@ -393,4 +423,4 @@ def test_malformed_structure_is_retried():
     assert calls == 2
     assert response.usage.n_retries == 0
     assert response.usage.n_retries_malformed_structure == 1
-    assert len(response.debug["llm_queries"]) == 2
+    assert len(response.debug["llm_attempts"]) == 2

@@ -106,39 +106,39 @@ def _create_llm_answer_type_for_question(
     if isinstance(question, ScoreQuestion):
         if llm_answer_mode == "discrete":
             return Annotated[int, Field(ge=0, lt=len(question.criteria))]
-        labels = [str(score) for score in range(len(question.criteria))]
+        answers = [str(score) for score in range(len(question.criteria))]
         descriptions = [
             _serialize_instruction_value_for_prompt(value)
             for value in question.criteria
         ]
-        return _create_probability_output_model_for_labels(
-            f"ScoreProbabilities{index}", labels, descriptions
+        return _create_probability_output_model_for_answers(
+            f"ScoreProbabilities{index}", answers, descriptions
         )
 
-    labels = list(question.criteria)
+    answers = list(question.criteria)
     if llm_answer_mode == "discrete":
-        return Literal.__getitem__(tuple(labels))
+        return Literal.__getitem__(tuple(answers))
     descriptions = [
         _serialize_instruction_value_for_prompt(value)
         for value in question.criteria.values()
     ]
-    return _create_probability_output_model_for_labels(
-        f"ChoiceProbabilities{index}", labels, descriptions
+    return _create_probability_output_model_for_answers(
+        f"ChoiceProbabilities{index}", answers, descriptions
     )
 
 
-def _create_probability_output_model_for_labels(
+def _create_probability_output_model_for_answers(
     name: str,
-    labels: list[str],
+    answers: list[str],
     descriptions: list[str],
 ) -> type[BaseModel]:
     fields = {
         f"value_{index}": (
             Probability,
-            Field(alias=label, description=description),
+            Field(alias=answer, description=description),
         )
-        for index, (label, description) in enumerate(
-            zip(labels, descriptions, strict=True)
+        for index, (answer, description) in enumerate(
+            zip(answers, descriptions, strict=True)
         )
     }
     return create_model(
@@ -163,8 +163,8 @@ def _build_llm_output_field_description(
 
         if isinstance(question, ChoiceQuestion):
             choices = "\n".join(
-                f"{label} = {_serialize_instruction_value_for_prompt(criterion)}"
-                for label, criterion in question.criteria.items()
+                f"{answer} = {_serialize_instruction_value_for_prompt(criterion)}"
+                for answer, criterion in question.criteria.items()
             )
             return f"{description}\nChoice labels, answer with one label:\n{choices}"
 

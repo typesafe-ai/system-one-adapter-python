@@ -207,6 +207,9 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# Local worktrees
+.claude/worktrees/
+
 # PyPI configuration file
 .pypirc
 
