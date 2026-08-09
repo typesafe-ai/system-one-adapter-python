@@ -21,7 +21,7 @@ import pytest
 from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
-from open_typesafe_client import OpenTypeSafeClient
+from typesafe_client_adapter import TypeSafeClientAdapter
 
 DOCUMENT = "This book was a delight to read."
 QUESTIONS = {
@@ -51,7 +51,7 @@ QUESTIONS = {
     ("client", "model", "expected_response_data"),
     [
         pytest.param(
-            OpenTypeSafeClient(),
+            TypeSafeClientAdapter(),
             "gpt-4o-mini",
             {
                 "model": "gpt-4o-mini",
@@ -95,7 +95,7 @@ QUESTIONS = {
             id="openai-probabilities",
         ),
         pytest.param(
-            OpenTypeSafeClient(llm_answer_mode="discrete"),
+            TypeSafeClientAdapter(llm_answer_mode="discrete"),
             "gpt-4o-mini",
             {
                 "model": "gpt-4o-mini",
@@ -139,7 +139,7 @@ QUESTIONS = {
             id="openai-discrete",
         ),
         pytest.param(
-            OpenTypeSafeClient(),
+            TypeSafeClientAdapter(),
             "claude-haiku-4-5",
             {
                 "model": "claude-haiku-4-5",
@@ -183,7 +183,7 @@ QUESTIONS = {
             id="anthropic-probabilities",
         ),
         pytest.param(
-            OpenTypeSafeClient(llm_answer_mode="discrete"),
+            TypeSafeClientAdapter(llm_answer_mode="discrete"),
             "claude-haiku-4-5",
             {
                 "model": "claude-haiku-4-5",

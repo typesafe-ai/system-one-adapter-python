@@ -953,39 +953,6 @@ wheels = [
 ]
 
 [[package]]
-name = "open-typesafe-client"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "anthropic" },
-    { name = "openai" },
-    { name = "pydantic-ai" },
-    { name = "typesafe-client" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-recording" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic", specifier = ">=0.121.0" },
-    { name = "openai", specifier = ">=2.53.0" },
-    { name = "pydantic-ai", specifier = ">=2.27.0" },
-    { name = "typesafe-client", specifier = ">=1.0.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-recording", specifier = ">=0.13.4" },
-    { name = "ruff", specifier = ">=0.14.14" },
-]
-
-[[package]]
 name = "openai"
 version = "2.53.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2071,6 +2038,39 @@ dependencies = [
 ]
 wheels = [
     { url = "https://pypi.typesafe.ai/typesafe-client/typesafe_client-1.0.0-py3-none-any.whl" },
+]
+
+[[package]]
+name = "typesafe-client-adapter"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "anthropic" },
+    { name = "openai" },
+    { name = "pydantic-ai" },
+    { name = "typesafe-client" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-recording" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic", specifier = ">=0.121.0" },
+    { name = "openai", specifier = ">=2.53.0" },
+    { name = "pydantic-ai", specifier = ">=2.27.0" },
+    { name = "typesafe-client", specifier = ">=1.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-recording", specifier = ">=0.13.4" },
+    { name = "ruff", specifier = ">=0.14.14" },
 ]
 
 [[package]]

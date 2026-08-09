@@ -10,7 +10,7 @@ from pydantic_ai.models import Model
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 from typesafe_client.values import QuestionCollectionType, question_to_api_model
 
-from open_typesafe_client.utils.probability_normalization import AnswerMode
+from typesafe_client_adapter.utils.probability_normalization import AnswerMode
 
 Probability: TypeAlias = Annotated[float, Field(ge=0, le=1)]
 Question: TypeAlias = NoulQuestion | ScoreQuestion | ChoiceQuestion
