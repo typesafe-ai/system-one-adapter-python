@@ -135,13 +135,11 @@ LLM response:
     "probability_errors": {},
     "llm_queries": [
       {
-        "llm_query": {
-          "messages": ["PydanticAI system and user messages"],
-          "model_settings": null,
-          "model_request_parameters": {
-            "output_mode": "prompted",
-            "output_object": {"json_schema": {"type": "object"}}
-          }
+        "messages": ["PydanticAI system and user messages"],
+        "model_settings": null,
+        "model_request_parameters": {
+          "output_mode": "prompted",
+          "output_object": {"json_schema": {"type": "object"}}
         },
         "llm_response": {"kind": "response", "parts": []},
         "debug_info": {
@@ -173,7 +171,7 @@ LLM response:
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
   - `llm_queries` contains one entry per LLM provider attempt, including malformed-output and transient-failure retries
-    - `llm_query` contains the raw PydanticAI messages, model settings, and request parameters, including the structured-output schema
+    - each query contains the raw PydanticAI messages, model settings, and request parameters, including the structured-output schema
     - `llm_response` contains the raw provider response, or `null` when the provider raised an error
     - `debug_info` contains provider identity and error details when applicable
 - Probability normalization

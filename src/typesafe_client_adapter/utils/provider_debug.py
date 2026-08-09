@@ -40,20 +40,18 @@ class ProviderDebugModel(WrapperModel):
             model_request_parameters,
         )
         query_entry: dict[str, Any] = {
-            "llm_query": {
-                "messages": ModelMessagesTypeAdapter.dump_python(
-                    messages,
-                    mode="json",
-                ),
-                "model_settings": to_jsonable_python(
-                    prepared_settings,
-                    serialize_unknown=True,
-                ),
-                "model_request_parameters": to_jsonable_python(
-                    prepared_parameters,
-                    serialize_unknown=True,
-                ),
-            },
+            "messages": ModelMessagesTypeAdapter.dump_python(
+                messages,
+                mode="json",
+            ),
+            "model_settings": to_jsonable_python(
+                prepared_settings,
+                serialize_unknown=True,
+            ),
+            "model_request_parameters": to_jsonable_python(
+                prepared_parameters,
+                serialize_unknown=True,
+            ),
             "llm_response": None,
             "debug_info": {
                 "model_name": self.model_name,

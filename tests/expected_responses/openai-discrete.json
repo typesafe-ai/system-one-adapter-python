@@ -39,103 +39,101 @@
     "probability_errors": {},
     "llm_queries": [
       {
-        "llm_query": {
-          "messages": [
-            {
-              "parts": [
-                {
-                  "content": "Document:\n\"This book was a delight to read.\"",
-                  "timestamp": "<dynamic>",
-                  "part_kind": "user-prompt"
-                }
-              ],
-              "timestamp": "<dynamic>",
-              "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.\nDo not add facts which are not supported by the document.",
-              "kind": "request",
-              "run_id": "<dynamic>",
-              "conversation_id": "<dynamic>",
-              "metadata": null,
-              "state": "complete"
-            }
-          ],
-          "model_settings": null,
-          "model_request_parameters": {
-            "function_tools": [],
-            "native_tools": [],
-            "tool_visibility": {},
-            "revealed_tool_names": [],
-            "output_mode": "prompted",
-            "output_object": {
-              "json_schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "answers": {
-                    "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.",
-                    "anyOf": [
-                      {
-                        "$ref": "#/$defs/TypeSafeAnswers"
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "answers"
-                ],
-                "type": "object",
-                "$defs": {
-                  "TypeSafeAnswers": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "positive": {
-                        "description": "The book review is positive.",
-                        "type": "boolean"
-                      },
-                      "stars": {
-                        "description": "Star rating for the book based on the review.\nScore levels, answer with the integer:\n0 = Horrendous. Unreadable garbage.\n1 = Pretty bad, but theoretically readable.\n2 = Acceptable, but just barely.\n3 = Pretty good. Worth reading but not perfect.\n4 = Transcendent and impactful. A must read.",
-                        "exclusiveMaximum": 5,
-                        "minimum": 0,
-                        "type": "integer"
-                      },
-                      "genre": {
-                        "description": "Which genre this review is about.\nChoice labels, answer with one label:\nfiction = A novel or short story.\nnonfiction = A book based on facts, real events, or ideas.",
-                        "enum": [
-                          "fiction",
-                          "nonfiction"
-                        ],
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "positive",
-                      "stars",
-                      "genre"
-                    ],
-                    "type": "object"
-                  }
-                }
-              },
-              "name": "TypeSafeEvaluation",
-              "description": null,
-              "strict": true
-            },
-            "output_tools": [],
-            "prompted_output_template": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{schema}\n\nDon't include any text or Markdown fencing before or after.\n",
-            "allow_text_output": true,
-            "allow_image_output": false,
-            "instruction_parts": [
+        "messages": [
+          {
+            "parts": [
               {
-                "content": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.\nDo not add facts which are not supported by the document.",
-                "dynamic": false,
-                "part_kind": "instruction"
-              },
-              {
-                "content": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{\"additionalProperties\": false, \"properties\": {\"answers\": {\"description\": \"Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.\", \"anyOf\": [{\"$ref\": \"#/$defs/TypeSafeAnswers\"}]}}, \"required\": [\"answers\"], \"type\": \"object\", \"$defs\": {\"TypeSafeAnswers\": {\"additionalProperties\": false, \"properties\": {\"positive\": {\"description\": \"The book review is positive.\", \"type\": \"boolean\"}, \"stars\": {\"description\": \"Star rating for the book based on the review.\\nScore levels, answer with the integer:\\n0 = Horrendous. Unreadable garbage.\\n1 = Pretty bad, but theoretically readable.\\n2 = Acceptable, but just barely.\\n3 = Pretty good. Worth reading but not perfect.\\n4 = Transcendent and impactful. A must read.\", \"exclusiveMaximum\": 5, \"minimum\": 0, \"type\": \"integer\"}, \"genre\": {\"description\": \"Which genre this review is about.\\nChoice labels, answer with one label:\\nfiction = A novel or short story.\\nnonfiction = A book based on facts, real events, or ideas.\", \"enum\": [\"fiction\", \"nonfiction\"], \"type\": \"string\"}}, \"required\": [\"positive\", \"stars\", \"genre\"], \"type\": \"object\"}}, \"title\": \"TypeSafeEvaluation\"}\n\nDon't include any text or Markdown fencing before or after.\n",
-                "dynamic": false,
-                "part_kind": "instruction"
+                "content": "Document:\n\"This book was a delight to read.\"",
+                "timestamp": "<dynamic>",
+                "part_kind": "user-prompt"
               }
             ],
-            "thinking": null
+            "timestamp": "<dynamic>",
+            "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.\nDo not add facts which are not supported by the document.",
+            "kind": "request",
+            "run_id": "<dynamic>",
+            "conversation_id": "<dynamic>",
+            "metadata": null,
+            "state": "complete"
           }
+        ],
+        "model_settings": null,
+        "model_request_parameters": {
+          "function_tools": [],
+          "native_tools": [],
+          "tool_visibility": {},
+          "revealed_tool_names": [],
+          "output_mode": "prompted",
+          "output_object": {
+            "json_schema": {
+              "additionalProperties": false,
+              "properties": {
+                "answers": {
+                  "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TypeSafeAnswers"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "answers"
+              ],
+              "type": "object",
+              "$defs": {
+                "TypeSafeAnswers": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "positive": {
+                      "description": "The book review is positive.",
+                      "type": "boolean"
+                    },
+                    "stars": {
+                      "description": "Star rating for the book based on the review.\nScore levels, answer with the integer:\n0 = Horrendous. Unreadable garbage.\n1 = Pretty bad, but theoretically readable.\n2 = Acceptable, but just barely.\n3 = Pretty good. Worth reading but not perfect.\n4 = Transcendent and impactful. A must read.",
+                      "exclusiveMaximum": 5,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "genre": {
+                      "description": "Which genre this review is about.\nChoice labels, answer with one label:\nfiction = A novel or short story.\nnonfiction = A book based on facts, real events, or ideas.",
+                      "enum": [
+                        "fiction",
+                        "nonfiction"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "positive",
+                    "stars",
+                    "genre"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "name": "TypeSafeEvaluation",
+            "description": null,
+            "strict": true
+          },
+          "output_tools": [],
+          "prompted_output_template": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{schema}\n\nDon't include any text or Markdown fencing before or after.\n",
+          "allow_text_output": true,
+          "allow_image_output": false,
+          "instruction_parts": [
+            {
+              "content": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.\nDo not add facts which are not supported by the document.",
+              "dynamic": false,
+              "part_kind": "instruction"
+            },
+            {
+              "content": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{\"additionalProperties\": false, \"properties\": {\"answers\": {\"description\": \"Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.\", \"anyOf\": [{\"$ref\": \"#/$defs/TypeSafeAnswers\"}]}}, \"required\": [\"answers\"], \"type\": \"object\", \"$defs\": {\"TypeSafeAnswers\": {\"additionalProperties\": false, \"properties\": {\"positive\": {\"description\": \"The book review is positive.\", \"type\": \"boolean\"}, \"stars\": {\"description\": \"Star rating for the book based on the review.\\nScore levels, answer with the integer:\\n0 = Horrendous. Unreadable garbage.\\n1 = Pretty bad, but theoretically readable.\\n2 = Acceptable, but just barely.\\n3 = Pretty good. Worth reading but not perfect.\\n4 = Transcendent and impactful. A must read.\", \"exclusiveMaximum\": 5, \"minimum\": 0, \"type\": \"integer\"}, \"genre\": {\"description\": \"Which genre this review is about.\\nChoice labels, answer with one label:\\nfiction = A novel or short story.\\nnonfiction = A book based on facts, real events, or ideas.\", \"enum\": [\"fiction\", \"nonfiction\"], \"type\": \"string\"}}, \"required\": [\"positive\", \"stars\", \"genre\"], \"type\": \"object\"}}, \"title\": \"TypeSafeEvaluation\"}\n\nDon't include any text or Markdown fencing before or after.\n",
+              "dynamic": false,
+              "part_kind": "instruction"
+            }
+          ],
+          "thinking": null
         },
         "llm_response": {
           "parts": [

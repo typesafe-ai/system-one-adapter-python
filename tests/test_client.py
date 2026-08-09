@@ -162,11 +162,10 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert response.debug["probability_errors"] == {}
 
     query_entry = response.debug["llm_queries"][0]
-    llm_query = query_entry["llm_query"]
-    serialized_messages = json.dumps(llm_query["messages"])
+    serialized_messages = json.dumps(query_entry["messages"])
     assert "Evaluate every question" in serialized_messages
     assert "A delightful novel." in serialized_messages
-    request_parameters = llm_query["model_request_parameters"]
+    request_parameters = query_entry["model_request_parameters"]
     assert request_parameters["output_mode"] == expected_output_mode
     assert "positive" in json.dumps(request_parameters["output_object"])
     assert query_entry["llm_response"]["kind"] == "response"
