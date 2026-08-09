@@ -14,6 +14,9 @@ dependencies = [
     "typesafe-client>=1.0.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/typesafe-ai/TypeSafeClientAdapter"
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
