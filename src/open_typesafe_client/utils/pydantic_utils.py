@@ -57,7 +57,10 @@ def create_llm_output_model(
         )
         fields[f"answer_{index}"] = (
             answer_type,
-            Field(alias=question_id, description=_build_question_description(question)),
+            Field(
+                alias=question_id,
+                description=_build_question_description(question, llm_answer_mode),
+            ),
         )
 
     answers_model = create_model(
@@ -68,7 +71,17 @@ def create_llm_output_model(
     return create_model(
         "TypeSafeEvaluation",
         __config__=ConfigDict(extra="forbid"),
-        answers=(answers_model, Field(description="Answers keyed by question ID.")),
+        # "Keyed by question ID" invited models to invent an ID and nest every answer
+        # under it. Name the properties as fixed instead.
+        answers=(
+            answers_model,
+            Field(
+                description=(
+                    "Exactly one answer per property below. Use these property names "
+                    "verbatim and do not add, rename, or nest them under any other key."
+                )
+            ),
+        ),
     )
 
 
@@ -155,8 +168,23 @@ def _create_probability_model(
     )
 
 
-def _build_question_description(question: Question) -> str:
+def _build_question_description(
+    question: Question,
+    llm_answer_mode: AnswerMode,
+) -> str:
     description = _serialize_instructions(question.instructions)
+    if isinstance(question, ScoreQuestion) and llm_answer_mode == "discrete":
+        # Discrete mode carries the criteria nowhere else, so a model given only the
+        # instructions guesses its own scale (such as 1-5 stars for a 0-4 score). In
+        # probabilities mode the criteria are already the per-label descriptions, and
+        # naming an integer answer here makes models return a score instead of a
+        # distribution.
+        levels = "\n".join(
+            f"{score} = {_serialize_instructions(criterion)}"
+            for score, criterion in enumerate(question.criteria)
+        )
+        return f"{description}\nScore levels, answer with the integer:\n{levels}"
+
     if not isinstance(question, NoulQuestion) or question.criteria is None:
         return description
 
