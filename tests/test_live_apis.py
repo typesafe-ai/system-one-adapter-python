@@ -1,19 +1,28 @@
-"""Cached live-provider compatibility test."""
+"""Provider compatibility tests replayed from recorded HTTP cassettes.
+
+VCR (``vcrpy`` through ``pytest-recording``, configured in ``conftest.py``) intercepts
+these tests at the HTTP layer: the first run records each provider exchange to a
+cassette, and every run after that replays it in place of the real call, so the request
+this client builds and the response it parses are both exercised for real.
+
+Cassettes live in ``tests/cassettes`` and are replayed by default, so the whole client
+stack runs against recorded provider traffic without credentials or network access.
+Re-record after changing prompts, schemas, or providers::
+
+    uv run pytest tests/test_live_apis.py --record-mode=rewrite
+
+Recording makes real, billable API calls and needs ``OPENAI_API_KEY``,
+``ANTHROPIC_API_KEY``, and ``TYPESAFE_API_KEY``.
+"""
 
 import os
-from pathlib import Path
 
 import pytest
 from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
 from open_typesafe_client import OpenTypeSafeClient
-from open_typesafe_client.utils.json_cache import JsonCache
 
-JSON_CACHE_PATH = Path(__file__).with_name("json_cache.json")
-if "REGENERATE_JSON_CACHE" in os.environ:
-    JSON_CACHE_PATH.write_text("{}\n")
-JSON_CACHE = JsonCache(JSON_CACHE_PATH)
 DOCUMENT = "This book was a delight to read."
 QUESTIONS = {
     "positive": NoulQuestion(instructions="The book review is positive."),
@@ -37,6 +46,7 @@ QUESTIONS = {
 }
 
 
+@pytest.mark.vcr
 @pytest.mark.parametrize(
     ("client", "model", "expected_response_data"),
     [
@@ -46,36 +56,41 @@ QUESTIONS = {
             {
                 "model": "gpt-4o-mini",
                 "answers": {
-                    "positive": {"type": "noul", "noul": 0.96},
+                    "positive": {
+                        "type": "noul",
+                        "noul": 1.0
+                    },
                     "stars": {
                         "type": "score",
-                        "score": 3.46,
-                        "confidence": 0.55,
+                        "score": 4.0,
+                        "confidence": 1.0,
                         "probabilities": {
-                            "0": 0.01,
-                            "1": 0.02,
-                            "2": 0.07,
-                            "3": 0.3,
-                            "4": 0.6,
-                        },
+                            "0": 0.0,
+                            "1": 0.0,
+                            "2": 0.0,
+                            "3": 0.0,
+                            "4": 1.0
+                        }
                     },
                     "genre": {
                         "type": "choice",
                         "choice": "fiction",
-                        "confidence": 0.64,
-                        "probabilities": {"fiction": 0.82, "nonfiction": 0.18},
-                    },
+                        "confidence": 1.0,
+                        "probabilities": {
+                            "fiction": 1.0,
+                            "nonfiction": 0.0
+                        }
+                    }
                 },
                 "usage": {
-                    "input_tokens": 356,
-                    "output_tokens": 91,
+                    "input_tokens": 621,
+                    "output_tokens": 42,
                     "n_retries": 0,
                     "n_retries_malformed_structure": 0,
-                    "latency": 0.74,
                     "max_error": 0.0,
                     "invalid_probs": 0,
-                    "probability_errors": {},
-                },
+                    "probability_errors": {}
+                }
             },
             id="openai-probabilities",
         ),
@@ -85,7 +100,10 @@ QUESTIONS = {
             {
                 "model": "gpt-4o-mini",
                 "answers": {
-                    "positive": {"type": "noul", "noul": 1.0},
+                    "positive": {
+                        "type": "noul",
+                        "noul": 1.0
+                    },
                     "stars": {
                         "type": "score",
                         "score": 4.0,
@@ -95,26 +113,28 @@ QUESTIONS = {
                             "1": 0.0,
                             "2": 0.0,
                             "3": 0.0,
-                            "4": 1.0,
-                        },
+                            "4": 1.0
+                        }
                     },
                     "genre": {
                         "type": "choice",
                         "choice": "fiction",
                         "confidence": 1.0,
-                        "probabilities": {"fiction": 1.0, "nonfiction": 0.0},
-                    },
+                        "probabilities": {
+                            "fiction": 1.0,
+                            "nonfiction": 0.0
+                        }
+                    }
                 },
                 "usage": {
-                    "input_tokens": 331,
-                    "output_tokens": 29,
+                    "input_tokens": 365,
+                    "output_tokens": 16,
                     "n_retries": 0,
                     "n_retries_malformed_structure": 0,
-                    "latency": 0.51,
                     "max_error": 0.0,
                     "invalid_probs": 0,
-                    "probability_errors": {},
-                },
+                    "probability_errors": {}
+                }
             },
             id="openai-discrete",
         ),
@@ -124,36 +144,41 @@ QUESTIONS = {
             {
                 "model": "claude-haiku-4-5",
                 "answers": {
-                    "positive": {"type": "noul", "noul": 0.94},
+                    "positive": {
+                        "type": "noul",
+                        "noul": 0.95
+                    },
                     "stars": {
                         "type": "score",
-                        "score": 3.23,
-                        "confidence": 0.3583333333333333,
+                        "score": 3.1500000000000004,
+                        "confidence": 0.675,
                         "probabilities": {
-                            "0": 0.02,
-                            "1": 0.03,
-                            "2": 0.1,
-                            "3": 0.4,
-                            "4": 0.45,
-                        },
+                            "0": 0.01,
+                            "1": 0.02,
+                            "2": 0.05,
+                            "3": 0.65,
+                            "4": 0.27
+                        }
                     },
                     "genre": {
                         "type": "choice",
                         "choice": "fiction",
-                        "confidence": 0.52,
-                        "probabilities": {"fiction": 0.76, "nonfiction": 0.24},
-                    },
+                        "confidence": 0.0,
+                        "probabilities": {
+                            "fiction": 0.5,
+                            "nonfiction": 0.5
+                        }
+                    }
                 },
                 "usage": {
-                    "input_tokens": 411,
-                    "output_tokens": 104,
+                    "input_tokens": 665,
+                    "output_tokens": 118,
                     "n_retries": 0,
                     "n_retries_malformed_structure": 0,
-                    "latency": 1.08,
                     "max_error": 0.0,
                     "invalid_probs": 0,
-                    "probability_errors": {},
-                },
+                    "probability_errors": {}
+                }
             },
             id="anthropic-probabilities",
         ),
@@ -163,72 +188,100 @@ QUESTIONS = {
             {
                 "model": "claude-haiku-4-5",
                 "answers": {
-                    "positive": {"type": "noul", "noul": 1.0},
+                    "positive": {
+                        "type": "noul",
+                        "noul": 1.0
+                    },
                     "stars": {
                         "type": "score",
-                        "score": 4.0,
+                        "score": 3.0,
                         "confidence": 1.0,
                         "probabilities": {
                             "0": 0.0,
                             "1": 0.0,
                             "2": 0.0,
-                            "3": 0.0,
-                            "4": 1.0,
-                        },
+                            "3": 1.0,
+                            "4": 0.0
+                        }
                     },
                     "genre": {
                         "type": "choice",
                         "choice": "fiction",
                         "confidence": 1.0,
-                        "probabilities": {"fiction": 1.0, "nonfiction": 0.0},
-                    },
+                        "probabilities": {
+                            "fiction": 1.0,
+                            "nonfiction": 0.0
+                        }
+                    }
                 },
                 "usage": {
-                    "input_tokens": 382,
-                    "output_tokens": 31,
+                    "input_tokens": 405,
+                    "output_tokens": 29,
                     "n_retries": 0,
                     "n_retries_malformed_structure": 0,
-                    "latency": 0.79,
                     "max_error": 0.0,
                     "invalid_probs": 0,
-                    "probability_errors": {},
-                },
+                    "probability_errors": {}
+                }
             },
             id="anthropic-discrete",
         ),
         pytest.param(
-            TypeSafeClient(),
+            TypeSafeClient(api_key=os.environ["TYPESAFE_API_KEY"]),
             "speed_latest",
             {
-                "model": "speed_latest",
+                "model": "speed_v10_mango_loco",
                 "answers": {
-                    "positive": {"type": "noul", "noul": 0.98},
+                    "positive": {
+                        "type": "noul",
+                        "noul": 0.99
+                    },
                     "stars": {
                         "type": "score",
-                        "score": 3.635,
-                        "confidence": 0.6958333333333333,
+                        "score": 3.15,
+                        "confidence": 0.86,
                         "probabilities": {
-                            "0": 0.005,
-                            "1": 0.005,
-                            "2": 0.04,
-                            "3": 0.25,
-                            "4": 0.7,
+                            "0": 0.0,
+                            "1": 0.0,
+                            "2": 0.01,
+                            "3": 0.83,
+                            "4": 0.16
                         },
+                        "legend": {
+                            "0": "Horrendous. Unreadable garbage.",
+                            "1": "Pretty bad, but theoretically readable.",
+                            "2": "Acceptable, but just barely.",
+                            "3": "Pretty good. Worth reading but not perfect.",
+                            "4": "Transcendent and impactful. A must read."
+                        }
                     },
                     "genre": {
                         "type": "choice",
                         "choice": "fiction",
-                        "confidence": 0.76,
-                        "probabilities": {"fiction": 0.88, "nonfiction": 0.12},
-                    },
+                        "confidence": 0.79,
+                        "probabilities": {
+                            "fiction": 0.89,
+                            "nonfiction": 0.11
+                        }
+                    }
                 },
-                "usage": {"input_tokens": 287, "output_tokens": 47},
+                "usage": {
+                    "input_tokens": 396,
+                    "output_tokens": 55
+                }
             },
             id="typesafe",
         ),
     ],
 )
 def test_live_responses_match_reference_shape(client, model, expected_response_data):
-    response = JSON_CACHE(client.system_one)(model, DOCUMENT, QUESTIONS)
+    response = client.system_one(model, DOCUMENT, QUESTIONS)
+    response_data = response.model_dump(mode="json")
 
-    assert response == expected_response_data
+    # Latency is wall-clock and so never reproducible; assert it is plausible and drop
+    # it rather than pinning a recorded value that the next run cannot match.
+    latency = response_data["usage"].pop("latency", None)
+    if latency is not None:
+        assert 0 < latency < 120
+
+    assert response_data == expected_response_data

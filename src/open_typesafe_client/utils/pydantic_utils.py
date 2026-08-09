@@ -57,7 +57,10 @@ def create_llm_output_model(
         )
         fields[f"answer_{index}"] = (
             answer_type,
-            Field(alias=question_id, description=_build_question_description(question)),
+            Field(
+                alias=question_id,
+                description=_build_question_description(question, llm_answer_mode),
+            ),
         )
 
     answers_model = create_model(
@@ -68,7 +71,17 @@ def create_llm_output_model(
     return create_model(
         "TypeSafeEvaluation",
         __config__=ConfigDict(extra="forbid"),
-        answers=(answers_model, Field(description="Answers keyed by question ID.")),
+        # "Keyed by question ID" invited models to invent an ID and nest every answer
+        # under it. Name the properties as fixed instead.
+        answers=(
+            answers_model,
+            Field(
+                description=(
+                    "Exactly one answer per property below. Use these property names "
+                    "verbatim and do not add, rename, or nest them under any other key."
+                )
+            ),
+        ),
     )
 
 
@@ -155,8 +168,26 @@ def _create_probability_model(
     )
 
 
-def _build_question_description(question: Question) -> str:
+def _build_question_description(
+    question: Question,
+    llm_answer_mode: AnswerMode,
+) -> str:
     description = _serialize_instructions(question.instructions)
+    if llm_answer_mode == "discrete":
+        if isinstance(question, ScoreQuestion):
+            levels = "\n".join(
+                f"{score} = {_serialize_instructions(criterion)}"
+                for score, criterion in enumerate(question.criteria)
+            )
+            return f"{description}\nScore levels, answer with the integer:\n{levels}"
+
+        if isinstance(question, ChoiceQuestion):
+            choices = "\n".join(
+                f"{label} = {_serialize_instructions(criterion)}"
+                for label, criterion in question.criteria.items()
+            )
+            return f"{description}\nChoice labels, answer with one label:\n{choices}"
+
     if not isinstance(question, NoulQuestion) or question.criteria is None:
         return description
 
