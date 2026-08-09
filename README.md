@@ -16,7 +16,11 @@ from typesafe_client.api.models import (
 )
 
 # TypeSafeClientAdapter has the same system_one interface as TypeSafeClient.
-typesafe_client_adapter = TypeSafeClientAdapter()
+typesafe_client_adapter = TypeSafeClientAdapter(
+    structured_outputs=True,
+    llm_answer_mode="probabilities",
+    normalize_probabilities=True,
+)
 typesafe_client = TypeSafeClient()
 
 document = "This book has been a delight to read! Looking forward to the next one!"
@@ -180,6 +184,29 @@ LLM response:
 }
 ```
 
+# Replaying an LLM attempt
+
+Every `llm_attempt` contains the native objects needed to call PydanticAI again. The
+corresponding provider credential must be available in the environment.
+
+```python
+import asyncio
+
+from pydantic_ai.models import infer_model
+
+llm_attempt = response.debug["llm_attempts"][0]
+model = infer_model(llm_attempt["debug_info"]["model_id"])
+replayed_response = asyncio.run(
+    model.request(
+        llm_attempt["messages"],
+        llm_attempt["model_settings"],
+        llm_attempt["model_request_parameters"],
+    )
+)
+```
+
+Repeating a request does not guarantee identical nondeterministic model output.
+
 # Specification
 
 - PydanticAI for queries
@@ -235,37 +262,3 @@ LLM response:
   - TypeSafeTokensExceededError (context window exceeded, including 413 `request_too_large`)
   - TypeSafeUnknownError (everything else, carrying the HTTP status_code)
   - All inherit from TypeSafeApiError
-
-# Replaying an LLM attempt
-
-Every `llm_attempt` contains the native objects needed to call PydanticAI again. The
-corresponding provider credential must be available in the environment.
-
-```python
-import asyncio
-
-from pydantic_ai.models import infer_model
-
-llm_attempt = response.debug["llm_attempts"][0]
-model = infer_model(llm_attempt["debug_info"]["model_id"])
-replayed_response = asyncio.run(
-    model.request(
-        llm_attempt["messages"],
-        llm_attempt["model_settings"],
-        llm_attempt["model_request_parameters"],
-    )
-)
-```
-
-Repeating a request does not guarantee identical nondeterministic model output.
-
-class TypeSafeClientAdapter(TypeSafeClient):
-   def __init__(
-      self, 
-      structured_outputs: bool = False,
-      llm_answer_mode: Literal['probabilities','discrete']="probabilities",
-      normalize_probabilities: bool = False,
-      n_retry_malformed_structure: int = 0,
-      retry: RetryConfig = NoRetries(),
-  ):
-     pass
