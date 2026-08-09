@@ -11,9 +11,11 @@ from typesafe_client.api.api_client import (
 from typesafe_client.api.retry import NoRetries
 
 from .client import TypeSafeClientAdapter
+from .llm_attempt import PydanticAIRequest
 
 __all__ = [
     "NoRetries",
+    "PydanticAIRequest",
     "RetryConfig",
     "TypeSafeApiError",
     "TypeSafeAuthError",

@@ -20,7 +20,7 @@ from typesafe_client.api.api_client import (
 )
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
-from typesafe_client_adapter import TypeSafeClientAdapter
+from typesafe_client_adapter import PydanticAIRequest, TypeSafeClientAdapter
 from typesafe_client_adapter.utils.error_handling import run_with_retries
 
 QUESTIONS = {
@@ -43,6 +43,14 @@ def model_response(response_data, expected_output_mode, expected_descriptions=()
     def return_configured_model_response(messages, agent_info):
         parameters = agent_info.model_request_parameters
         assert parameters.output_mode == expected_output_mode
+        if prompted_output_instructions := parameters.prompted_output_instructions:
+            assert (
+                sum(
+                    instruction_part.content == prompted_output_instructions
+                    for instruction_part in parameters.instruction_parts or []
+                )
+                == 1
+            )
         output_schema = parameters.output_object.json_schema
         for expected_description in expected_descriptions:
             assert expected_description in json.dumps(output_schema)
@@ -156,6 +164,11 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     )
     assert len(restored_messages) == 2
     assert llm_query["debug_info"]["model_name"] == "test-model"
+
+    pydantic_ai_request = PydanticAIRequest.from_llm_attempt(llm_query)
+    replayed_response = asyncio.run(pydantic_ai_request.replay(model))
+    assert pydantic_ai_request.model_id == model.model_id
+    assert replayed_response.parts == restored_messages[-1].parts
 
 
 @pytest.mark.parametrize(

@@ -231,6 +231,27 @@ LLM response:
   - TypeSafeUnknownError (everything else, carrying the HTTP status_code)
   - All inherit from TypeSafeApiError
 
+# Replaying an LLM attempt
+
+Every `llm_attempt` can be deserialized and sent through PydanticAI again. The
+recorded model ID is used by default, so the corresponding provider credential must
+be available in the environment.
+
+```python
+import asyncio
+
+from typesafe_client_adapter import PydanticAIRequest
+
+pydantic_ai_request = PydanticAIRequest.from_llm_attempt(
+    response.debug["llm_attempts"][0]
+)
+replayed_response = asyncio.run(pydantic_ai_request.replay())
+```
+
+Pass `model=` to `replay()` when the original call used a configured model instance,
+custom provider, or model that cannot be inferred from its recorded ID. Replaying
+repeats the request but does not guarantee identical nondeterministic model output.
+
 class TypeSafeClientAdapter(TypeSafeClient):
    def __init__(
       self, 
