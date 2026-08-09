@@ -133,7 +133,7 @@ LLM response:
     "max_error": 0.0,
     "invalid_probs": 0,
     "probability_errors": {},
-    "query": [
+    "llm_queries": [
       {
         "llm_query": {
           "messages": ["PydanticAI system and user messages"],
@@ -172,7 +172,7 @@ LLM response:
   - `invalid_probs` counts answers whose probability error exceeds `1e-6`
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
-  - `query` contains one entry per LLM provider attempt, including malformed-output and transient-failure retries
+  - `llm_queries` contains one entry per LLM provider attempt, including malformed-output and transient-failure retries
     - `llm_query` contains the raw PydanticAI messages, model settings, and request parameters, including the structured-output schema
     - `llm_response` contains the raw provider response, or `null` when the provider raised an error
     - `debug_info` contains provider identity and error details when applicable

@@ -306,8 +306,8 @@ def test_live_responses_match_reference_shape(
         assert debug["max_error"] == 0
         assert debug["invalid_probs"] == 0
         assert debug["probability_errors"] == {}
-        assert len(debug["query"]) == 1
-        query_entry = debug["query"][0]
+        assert len(debug["llm_queries"]) == 1
+        query_entry = debug["llm_queries"][0]
         serialized_messages = json.dumps(query_entry["llm_query"]["messages"])
         assert "Evaluate every question" in serialized_messages
         assert DOCUMENT in serialized_messages

@@ -20,7 +20,7 @@ class ProviderDebugModel(WrapperModel):
 
     def __init__(self, wrapped: str | Model) -> None:
         super().__init__(wrapped)
-        self.query: list[dict[str, Any]] = []
+        self.llm_queries: list[dict[str, Any]] = []
 
     async def request(
         self,
@@ -62,7 +62,7 @@ class ProviderDebugModel(WrapperModel):
                 "base_url": self.base_url,
             },
         }
-        self.query.append(query_entry)
+        self.llm_queries.append(query_entry)
 
         try:
             model_response = await self.wrapped.request(

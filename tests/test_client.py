@@ -161,7 +161,7 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert response.debug["invalid_probs"] == 0
     assert response.debug["probability_errors"] == {}
 
-    query_entry = response.debug["query"][0]
+    query_entry = response.debug["llm_queries"][0]
     llm_query = query_entry["llm_query"]
     serialized_messages = json.dumps(llm_query["messages"])
     assert "Evaluate every question" in serialized_messages
@@ -327,10 +327,13 @@ def test_transient_errors_are_retried(async_call):
     assert calls == 2
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 0
-    assert len(response.debug["query"]) == 2
-    assert response.debug["query"][0]["llm_response"] is None
-    assert response.debug["query"][0]["debug_info"]["error_type"] == "ModelHTTPError"
-    assert response.debug["query"][1]["llm_response"]["kind"] == "response"
+    assert len(response.debug["llm_queries"]) == 2
+    assert response.debug["llm_queries"][0]["llm_response"] is None
+    assert (
+        response.debug["llm_queries"][0]["debug_info"]["error_type"]
+        == "ModelHTTPError"
+    )
+    assert response.debug["llm_queries"][1]["llm_response"]["kind"] == "response"
 
 
 @pytest.mark.parametrize("async_call", [False, True])
@@ -394,7 +397,7 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
     assert response.usage.output_tokens == 100
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 1
-    assert len(response.debug["query"]) == 3
+    assert len(response.debug["llm_queries"]) == 3
 
 
 @pytest.mark.parametrize(
@@ -466,4 +469,4 @@ def test_malformed_structure_is_retried():
     assert calls == 2
     assert response.usage.n_retries == 0
     assert response.usage.n_retries_malformed_structure == 1
-    assert len(response.debug["query"]) == 2
+    assert len(response.debug["llm_queries"]) == 2

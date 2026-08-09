@@ -188,7 +188,7 @@ class _Evaluation:
             usage=Usage(**usage_data),
             debug={
                 **probability_debug_data(probability_normalizations),
-                "query": self.provider_debug_model.query,
+                "llm_queries": self.provider_debug_model.llm_queries,
             },
         )
 

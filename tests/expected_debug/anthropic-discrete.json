@@ -2,7 +2,7 @@
   "max_error": 0.0,
   "invalid_probs": 0,
   "probability_errors": {},
-  "query": [
+  "llm_queries": [
     {
       "llm_query": {
         "messages": [
