@@ -221,7 +221,10 @@ LLM response:
   - request/response credentials are stripped at record time (see `tests/conftest.py`); matching includes the request body because every call posts to the same endpoint
 - Exception handling tests use deterministic provider-shaped HTTP responses passed through the real provider SDK and PydanticAI adapter stacks
   - they do not guarantee future provider payload compatibility; revalidate them against live APIs after provider or SDK changes
-  - OpenAI supplies `context_length_exceeded`; Anthropic currently supplies a generic `invalid_request_error` with a `prompt is too long` message, so its context-window mapping requires particular caution
+  - context-window detection needs HTTP 400 or 413 plus either a known error code (`context_length_exceeded`, `request_too_large`; `code` for OpenAI, `type` for Anthropic) or a known message fragment (`context window`, `maximum context`, `context limit`, `prompt is too long`, `request too large`), also matched against the stringified error so unparseable bodies still map
+    - fragments are needed because OpenAI's Responses API can leave `code` null and Anthropic sends a generic `invalid_request_error`
+    - the status gate is what keeps rate-limit wording (429 `Too many tokens per minute`) out of the mapping; do not widen the fragments without it
+    - codes that are not context-window-specific stay out, notably OpenAI's `string_above_max_length`, which is generic field-length validation
 - Compatibility scope
   - `TypeSafeClientAdapter` subclasses `TypeSafeClient`
   - supports synchronous and asynchronous `system_one`, context management, `close`, and `aclose`
@@ -229,7 +232,7 @@ LLM response:
 - `SystemOneResponse` includes `.model`, `.answers`, `.usage`, and `.debug`; each answer includes `.type`.
 - Provider SDK exceptions are mapped onto reference-shaped error types: 
   - TypeSafeAuthError (bad key), TypeSafeTimeoutError (timeouts and connection failures) 
-  - TypeSafeTokensExceededError (context window exceeded)
+  - TypeSafeTokensExceededError (context window exceeded, including 413 `request_too_large`)
   - TypeSafeUnknownError (everything else, carrying the HTTP status_code)
   - All inherit from TypeSafeApiError
 

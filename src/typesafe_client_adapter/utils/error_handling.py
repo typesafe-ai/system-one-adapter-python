@@ -18,20 +18,21 @@ from typesafe_client.api.api_client import (
 
 ResultT = TypeVar("ResultT")
 
-# Provider error codes and message fragments signalling the input exceeded the
-# model's context window. Providers disagree on shape, so both are checked.
+# Provider error codes and prose fragments signalling the input exceeded the model's
+# context window. Providers disagree on shape, so both are checked. The codes are also
+# scanned for as text, covering bodies that did not parse as JSON.
+# Only codes that mean the context window specifically belong here. OpenAI's
+# ``string_above_max_length`` is deliberately excluded: it is a generic field-length
+# validation error, also raised for oversized tool names and similar fields.
 CONTEXT_WINDOW_ERROR_CODES = frozenset(
-    {"context_length_exceeded", "request_too_large", "string_above_max_length"}
+    {"context_length_exceeded", "request_too_large"}
 )
 CONTEXT_WINDOW_MESSAGE_MARKERS = (
     "context window",
     "maximum context",
-    "context_length_exceeded",
     "context limit",
     "prompt is too long",
     "request too large",
-    "request_too_large",
-    "too many tokens",
 )
 
 
@@ -49,10 +50,7 @@ def run_with_retries(
         try:
             return function(), attempt - 1
         except Exception as error:
-            mapped_error = _map_provider_exception_to_typesafe_api_error(error)
-            retryable = isinstance(mapped_error, TypeSafeTimeoutError) or (
-                mapped_error.is_retryable()
-            )
+            mapped_error, retryable = _map_error_and_decide_whether_to_retry(error)
             if attempt == retry.max_attempts or not retryable:
                 raise mapped_error from error
             if delay := retry.next_delay(attempt=attempt):
@@ -75,16 +73,34 @@ async def run_with_retries_async(
         try:
             return await function(), attempt - 1
         except Exception as error:
-            mapped_error = _map_provider_exception_to_typesafe_api_error(error)
-            retryable = isinstance(mapped_error, TypeSafeTimeoutError) or (
-                mapped_error.is_retryable()
-            )
+            mapped_error, retryable = _map_error_and_decide_whether_to_retry(error)
             if attempt == retry.max_attempts or not retryable:
                 raise mapped_error from error
             if delay := retry.next_delay(attempt=attempt):
                 await asyncio.sleep(delay)
 
     raise AssertionError("retry loop did not return or raise")
+
+
+def _map_error_and_decide_whether_to_retry(
+    error: Exception,
+) -> tuple[TypeSafeApiError, bool]:
+    """Map a provider exception and decide whether the attempt may be retried.
+
+    Timeouts are retried even though ``TypeSafeTimeoutError.is_retryable()`` reports
+    False. The reference client retries every ``httpx.RequestError`` before it ever
+    becomes a ``TypeSafeTimeoutError``, so consulting ``is_retryable`` alone would make
+    transient connection failures non-retryable here. This is deliberately slightly
+    broader than the reference: HTTP 408 and 504 responses are retried too.
+
+    :param error: Exception raised by the provider call.
+    :return: Mapped error and whether it is retryable.
+    """
+    mapped_error = _map_provider_exception_to_typesafe_api_error(error)
+    retryable = isinstance(mapped_error, TypeSafeTimeoutError) or (
+        mapped_error.is_retryable()
+    )
+    return mapped_error, retryable
 
 
 def _map_provider_exception_to_typesafe_api_error(

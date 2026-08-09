@@ -114,6 +114,16 @@ def test_status_errors_are_retried(status_code):
             TypeSafeUnknownError,
             429,
         ),
+        # A 400 unrelated to the context window must not be over-matched.
+        (
+            lambda: ModelHTTPError(
+                400,
+                "test-model",
+                {"error": {"message": "Invalid schema for tool 'final_result'."}},
+            ),
+            TypeSafeUnknownError,
+            400,
+        ),
         (lambda: RuntimeError("something else"), TypeSafeUnknownError, None),
     ],
 )
@@ -131,8 +141,35 @@ def test_provider_errors(make_error, error_type, expected_status_code):
         assert raised.value.status_code == expected_status_code
 
 
+@pytest.fixture
+def mock_provider_model():
+    """Build provider models backed by a mock transport, closing their clients after.
+
+    :return: Factory taking the provider name and an httpx request handler.
+    """
+    http_clients = []
+
+    def create_model_backed_by_mock_transport(provider, handle_request):
+        http_client = httpx.AsyncClient(transport=httpx.MockTransport(handle_request))
+        http_clients.append(http_client)
+        if provider == "openai":
+            return OpenAIResponsesModel(
+                "gpt-4o-mini",
+                provider=OpenAIProvider(api_key="test", http_client=http_client),
+            )
+        return AnthropicModel(
+            "claude-haiku-4-5",
+            provider=AnthropicProvider(api_key="test", http_client=http_client),
+        )
+
+    yield create_model_backed_by_mock_transport
+
+    for http_client in http_clients:
+        asyncio.run(http_client.aclose())
+
+
 @pytest.mark.parametrize(
-    ("provider", "status_code", "error_body"),
+    ("provider", "status_code", "error_body", "expected_error"),
     [
         pytest.param(
             "openai",
@@ -145,6 +182,7 @@ def test_provider_errors(make_error, error_type, expected_status_code):
                     "code": "context_length_exceeded",
                 }
             },
+            TypeSafeTokensExceededError,
             id="openai-chat-completions-code",
         ),
         pytest.param(
@@ -162,6 +200,7 @@ def test_provider_errors(make_error, error_type, expected_status_code):
                     "code": None,
                 }
             },
+            TypeSafeTokensExceededError,
             id="openai-responses-no-code",
         ),
         pytest.param(
@@ -175,6 +214,7 @@ def test_provider_errors(make_error, error_type, expected_status_code):
                     "code": "request_too_large",
                 }
             },
+            TypeSafeTokensExceededError,
             id="openai-request-too-large",
         ),
         pytest.param(
@@ -188,6 +228,7 @@ def test_provider_errors(make_error, error_type, expected_status_code):
                 },
                 "request_id": "req_test",
             },
+            TypeSafeTokensExceededError,
             id="anthropic-prompt-too-long",
         ),
         pytest.param(
@@ -204,6 +245,7 @@ def test_provider_errors(make_error, error_type, expected_status_code):
                 },
                 "request_id": "req_test",
             },
+            TypeSafeTokensExceededError,
             id="anthropic-max-tokens-exceed-limit",
         ),
         pytest.param(
@@ -211,36 +253,60 @@ def test_provider_errors(make_error, error_type, expected_status_code):
             400,
             # Unparseable body: detection must fall back to the stringified error.
             "prompt is too long: 220256 tokens > 200000 maximum",
+            TypeSafeTokensExceededError,
             id="non-json-body",
+        ),
+        pytest.param(
+            "openai",
+            400,
+            # Generic field-length validation, raised for oversized tool names and
+            # similar fields, so it must not be read as a context-window error.
+            {
+                "error": {
+                    "message": (
+                        "Invalid 'tools[0].name': string too long. Expected a string "
+                        "with maximum length 64."
+                    ),
+                    "type": "invalid_request_error",
+                    "param": "tools[0].name",
+                    "code": "string_above_max_length",
+                }
+            },
+            TypeSafeUnknownError,
+            id="openai-string-above-max-length",
+        ),
+        pytest.param(
+            "openai",
+            400,
+            {
+                "error": {
+                    "message": "Invalid schema for response_format.",
+                    "type": "invalid_request_error",
+                    "param": "response_format",
+                    "code": None,
+                }
+            },
+            TypeSafeUnknownError,
+            id="openai-unrelated-bad-request",
         ),
     ],
 )
-def test_provider_context_window_errors_are_mapped(provider, status_code, error_body):
+def test_provider_context_window_errors_are_mapped(
+    mock_provider_model,
+    provider,
+    status_code,
+    error_body,
+    expected_error,
+):
     def return_provider_error(request):
         if isinstance(error_body, str):
             return httpx.Response(status_code, text=error_body, request=request)
         return httpx.Response(status_code, json=error_body, request=request)
 
-    http_client = httpx.AsyncClient(
-        transport=httpx.MockTransport(return_provider_error)
-    )
-    try:
-        if provider == "openai":
-            model = OpenAIResponsesModel(
-                "gpt-4o-mini",
-                provider=OpenAIProvider(api_key="test", http_client=http_client),
-            )
-        else:
-            model = AnthropicModel(
-                "claude-haiku-4-5",
-                provider=AnthropicProvider(api_key="test", http_client=http_client),
-            )
+    model = mock_provider_model(provider, return_provider_error)
 
-        with pytest.raises(TypeSafeTokensExceededError):
-            TypeSafeClientAdapter().system_one(
-                model,
-                "document",
-                {"answer": QUESTION},
-            )
-    finally:
-        asyncio.run(http_client.aclose())
+    with pytest.raises(expected_error) as raised:
+        TypeSafeClientAdapter().system_one(model, "document", {"answer": QUESTION})
+
+    if expected_error is TypeSafeUnknownError:
+        assert raised.value.status_code == status_code
