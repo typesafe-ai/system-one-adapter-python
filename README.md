@@ -200,9 +200,9 @@ LLM response:
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
   - `llm_attempts` contains one dictionary per PydanticAI model attempt
-    - each dictionary contains serialized messages, model settings, and `ModelRequestParameters`
+    - each dictionary contains native PydanticAI messages, model settings, and `ModelRequestParameters`; `model_dump(mode="json")` serializes them
     - request parameters preserve function tools, output tools, output mode, and the structured-output schema needed to reconstruct the call
-    - `llm_response` contains the matching serialized PydanticAI `ModelResponse`, or `null` when no response arrived
+    - `llm_response` contains the matching PydanticAI `ModelResponse`, or `None` when no response arrived
     - `debug_info` contains model, provider, finish-reason, and error metadata for that attempt
   - the messages and response round-trip through PydanticAI's `ModelMessagesTypeAdapter`
   - a public PydanticAI `model_request` hook captures the logical request immediately before the model call
@@ -233,20 +233,22 @@ LLM response:
 
 # Replaying an LLM attempt
 
-Every `llm_attempt` can be deserialized and sent through PydanticAI again. The
-recorded model ID is used by default, so the corresponding provider credential must
-be available in the environment.
+Every `llm_attempt` contains the native objects needed to call PydanticAI again. The
+corresponding provider credential must be available in the environment.
 
 ```python
 import asyncio
 
 from pydantic_ai.models import infer_model
-from typesafe_client_adapter import deserialize_llm_attempt
 
 llm_attempt = response.debug["llm_attempts"][0]
 model = infer_model(llm_attempt["debug_info"]["model_id"])
 replayed_response = asyncio.run(
-    model.request(*deserialize_llm_attempt(llm_attempt))
+    model.request(
+        llm_attempt["messages"],
+        llm_attempt["model_settings"],
+        llm_attempt["model_request_parameters"],
+    )
 )
 ```
 

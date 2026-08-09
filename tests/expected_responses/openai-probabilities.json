@@ -44,15 +44,15 @@
             "parts": [
               {
                 "content": "Document:\n\"This book was a delight to read.\"",
-                "timestamp": "2026-08-09T04:09:49.268017Z",
+                "timestamp": "2026-08-09T04:21:24.031483Z",
                 "part_kind": "user-prompt"
               }
             ],
-            "timestamp": "2026-08-09T04:09:49.268203Z",
+            "timestamp": "2026-08-09T04:21:24.031669Z",
             "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
             "kind": "request",
-            "run_id": "019fe4b6-6fd3-7128-a690-79baf5706f50",
-            "conversation_id": "019fe4b6-6fd3-7128-a690-79bb4a358979",
+            "run_id": "019fe4c1-09be-77a1-8ffb-05814853fa14",
+            "conversation_id": "019fe4c1-09be-77a1-8ffb-05827742f6af",
             "metadata": null,
             "state": "complete"
           }
@@ -212,11 +212,11 @@
             "details": {
               "reasoning_tokens": 0
             },
-            "cost": null,
+            "cost": "0.00011835",
             "output_reasoning_tokens": 0
           },
           "model_name": "gpt-4o-mini-2024-07-18",
-          "timestamp": "2026-08-09T04:09:49.485042Z",
+          "timestamp": "2026-08-09T04:21:24.227338Z",
           "kind": "response",
           "provider_name": "openai",
           "provider_url": "https://api.openai.com/v1/",
@@ -226,8 +226,8 @@
           },
           "provider_response_id": "resp_0a1823890936afc8006a77d408109c81998fae2f20faf926b8",
           "finish_reason": "stop",
-          "run_id": null,
-          "conversation_id": null,
+          "run_id": "019fe4c1-09be-77a1-8ffb-05814853fa14",
+          "conversation_id": "019fe4c1-09be-77a1-8ffb-05827742f6af",
           "metadata": null,
           "state": "complete"
         },

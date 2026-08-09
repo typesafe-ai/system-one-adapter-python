@@ -20,7 +20,7 @@ from typesafe_client.api.api_client import (
 )
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
-from typesafe_client_adapter import TypeSafeClientAdapter, deserialize_llm_attempt
+from typesafe_client_adapter import TypeSafeClientAdapter
 from typesafe_client_adapter.utils.error_handling import run_with_retries
 
 QUESTIONS = {
@@ -157,23 +157,29 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
 
     llm_query = response.debug["llm_attempts"][0]
     llm_response = llm_query["llm_response"]
-    serialized_query = json.dumps(llm_query)
+    serialized_llm_attempt = response.model_dump(mode="json")["debug"][
+        "llm_attempts"
+    ][0]
+    serialized_query = json.dumps(serialized_llm_attempt)
     assert "Evaluate every question" in serialized_query
     assert "A delightful novel." in serialized_query
-    assert llm_query["messages"][-1]["kind"] == "request"
-    model_request_parameters = llm_query["model_request_parameters"]
+    assert llm_query["messages"][-1].kind == "request"
+    model_request_parameters = serialized_llm_attempt["model_request_parameters"]
     assert model_request_parameters["output_mode"] == expected_output_mode
     assert "positive" in json.dumps(model_request_parameters["output_object"])
-    assert llm_response["kind"] == "response"
+    assert isinstance(llm_response, ModelResponse)
     restored_messages = ModelMessagesTypeAdapter.validate_python(
-        [*llm_query["messages"], llm_response]
+        [*serialized_llm_attempt["messages"], serialized_llm_attempt["llm_response"]]
     )
     assert len(restored_messages) == 2
     assert llm_query["debug_info"]["model_name"] == "test-model"
 
-    model_request_arguments = deserialize_llm_attempt(llm_query)
     replayed_response = asyncio.run(
-        model.request(*model_request_arguments)
+        model.request(
+            llm_query["messages"],
+            llm_query["model_settings"],
+            llm_query["model_request_parameters"],
+        )
     )
     assert replayed_response.parts == restored_messages[-1].parts
 
@@ -272,7 +278,10 @@ def test_transient_errors_are_retried(async_call):
         response.debug["llm_attempts"][0]["debug_info"]["error_type"]
         == "ModelHTTPError"
     )
-    assert response.debug["llm_attempts"][1]["llm_response"]["kind"] == "response"
+    assert isinstance(
+        response.debug["llm_attempts"][1]["llm_response"],
+        ModelResponse,
+    )
 
 
 @pytest.mark.parametrize("async_call", [False, True])
