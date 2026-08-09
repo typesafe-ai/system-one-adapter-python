@@ -154,9 +154,23 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert response.usage.n_retries == 0
     assert response.usage.n_retries_malformed_structure == 0
     assert response.usage.latency >= 0
-    assert response.usage.max_error == 0
-    assert response.usage.invalid_probs == 0
-    assert response.usage.probability_errors == {}
+    assert not hasattr(response.usage, "max_error")
+    assert not hasattr(response.usage, "invalid_probs")
+    assert not hasattr(response.usage, "probability_errors")
+    assert response.debug["max_error"] == 0
+    assert response.debug["invalid_probs"] == 0
+    assert response.debug["probability_errors"] == {}
+
+    query_entry = response.debug["query"][0]
+    llm_query = query_entry["llm_query"]
+    serialized_messages = json.dumps(llm_query["messages"])
+    assert "Evaluate every question" in serialized_messages
+    assert "A delightful novel." in serialized_messages
+    request_parameters = llm_query["model_request_parameters"]
+    assert request_parameters["output_mode"] == expected_output_mode
+    assert "positive" in json.dumps(request_parameters["output_object"])
+    assert query_entry["llm_response"]["kind"] == "response"
+    assert query_entry["debug_info"]["model_name"] == "test-model"
 
 
 @pytest.mark.parametrize(
@@ -217,12 +231,12 @@ def test_probability_validation(
     assert response.answers["genre"].probabilities == pytest.approx(
         {"fiction": expected_probability, "nonfiction": expected_probability}
     )
-    assert response.usage.max_error == pytest.approx(expected_max_error)
-    assert response.usage.invalid_probs == len(expected_probability_errors)
-    assert response.usage.probability_errors == pytest.approx(
+    assert response.debug["max_error"] == pytest.approx(expected_max_error)
+    assert response.debug["invalid_probs"] == len(expected_probability_errors)
+    assert response.debug["probability_errors"] == pytest.approx(
         expected_probability_errors
     )
-    assert getattr(response.usage, "original_probabilities", None) == expected_originals
+    assert response.debug.get("original_probabilities") == expected_originals
 
 
 @pytest.mark.parametrize(
@@ -313,6 +327,10 @@ def test_transient_errors_are_retried(async_call):
     assert calls == 2
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 0
+    assert len(response.debug["query"]) == 2
+    assert response.debug["query"][0]["llm_response"] is None
+    assert response.debug["query"][0]["debug_info"]["error_type"] == "ModelHTTPError"
+    assert response.debug["query"][1]["llm_response"]["kind"] == "response"
 
 
 @pytest.mark.parametrize("async_call", [False, True])
@@ -376,6 +394,7 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
     assert response.usage.output_tokens == 100
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 1
+    assert len(response.debug["query"]) == 3
 
 
 @pytest.mark.parametrize(
@@ -447,3 +466,4 @@ def test_malformed_structure_is_retried():
     assert calls == 2
     assert response.usage.n_retries == 0
     assert response.usage.n_retries_malformed_structure == 1
+    assert len(response.debug["query"]) == 2

@@ -11,6 +11,7 @@ from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuesti
 from typesafe_client.values import QuestionCollectionType, question_to_api_model
 
 from typesafe_client_adapter.utils.probability_normalization import AnswerMode
+from typesafe_client_adapter.utils.provider_debug import ProviderDebugModel
 
 Probability: TypeAlias = Annotated[float, Field(ge=0, le=1)]
 Question: TypeAlias = NoulQuestion | ScoreQuestion | ChoiceQuestion
@@ -91,7 +92,7 @@ def create_pydantic_ai_agent(
     structured_outputs: bool,
     n_retry_malformed_structure: int,
     instructions: str,
-) -> Agent:
+) -> tuple[Agent, ProviderDebugModel]:
     """Create the configured PydanticAI agent.
 
     :param model: PydanticAI model or model name.
@@ -99,19 +100,21 @@ def create_pydantic_ai_agent(
     :param structured_outputs: Whether to use native structured output.
     :param n_retry_malformed_structure: Output validation retry count.
     :param instructions: Agent system instructions.
-    :return: Configured agent.
+    :return: Configured agent and its provider debug wrapper.
     """
     requested_output: Any = (
         NativeOutput(output_model)
         if structured_outputs
         else PromptedOutput(output_model)
     )
-    return Agent(
-        _resolve_pydantic_ai_model(model),
+    provider_debug_model = ProviderDebugModel(_resolve_pydantic_ai_model(model))
+    pydantic_agent = Agent(
+        provider_debug_model,
         output_type=requested_output,
         instructions=instructions,
         retries={"output": n_retry_malformed_structure},
     )
+    return pydantic_agent, provider_debug_model
 
 
 def get_model_name(model: str | Model) -> str:

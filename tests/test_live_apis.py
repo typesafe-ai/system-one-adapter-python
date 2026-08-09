@@ -15,6 +15,7 @@ Recording makes real, billable API calls and needs ``OPENAI_API_KEY``,
 ``ANTHROPIC_API_KEY``, and ``TYPESAFE_API_KEY``.
 """
 
+import json
 import os
 
 import pytest
@@ -86,10 +87,7 @@ QUESTIONS = {
                     "input_tokens": 621,
                     "output_tokens": 42,
                     "n_retries": 0,
-                    "n_retries_malformed_structure": 0,
-                    "max_error": 0.0,
-                    "invalid_probs": 0,
-                    "probability_errors": {}
+                    "n_retries_malformed_structure": 0
                 }
             },
             id="openai-probabilities",
@@ -130,10 +128,7 @@ QUESTIONS = {
                     "input_tokens": 365,
                     "output_tokens": 16,
                     "n_retries": 0,
-                    "n_retries_malformed_structure": 0,
-                    "max_error": 0.0,
-                    "invalid_probs": 0,
-                    "probability_errors": {}
+                    "n_retries_malformed_structure": 0
                 }
             },
             id="openai-discrete",
@@ -174,10 +169,7 @@ QUESTIONS = {
                     "input_tokens": 665,
                     "output_tokens": 118,
                     "n_retries": 0,
-                    "n_retries_malformed_structure": 0,
-                    "max_error": 0.0,
-                    "invalid_probs": 0,
-                    "probability_errors": {}
+                    "n_retries_malformed_structure": 0
                 }
             },
             id="anthropic-probabilities",
@@ -218,10 +210,7 @@ QUESTIONS = {
                     "input_tokens": 405,
                     "output_tokens": 29,
                     "n_retries": 0,
-                    "n_retries_malformed_structure": 0,
-                    "max_error": 0.0,
-                    "invalid_probs": 0,
-                    "probability_errors": {}
+                    "n_retries_malformed_structure": 0
                 }
             },
             id="anthropic-discrete",
@@ -283,5 +272,23 @@ def test_live_responses_match_reference_shape(client, model, expected_response_d
     latency = response_data["usage"].pop("latency", None)
     if latency is not None:
         assert 0 < latency < 120
+
+    debug = response_data.pop("debug", None)
+    if isinstance(client, TypeSafeClientAdapter):
+        assert debug["max_error"] == 0
+        assert debug["invalid_probs"] == 0
+        assert debug["probability_errors"] == {}
+        assert len(debug["query"]) == 1
+        query_entry = debug["query"][0]
+        serialized_messages = json.dumps(query_entry["llm_query"]["messages"])
+        assert "Evaluate every question" in serialized_messages
+        assert DOCUMENT in serialized_messages
+        assert "json_schema" in query_entry["llm_query"]["model_request_parameters"][
+            "output_object"
+        ]
+        assert query_entry["llm_response"]["kind"] == "response"
+        assert query_entry["debug_info"]["model_name"] == model
+    else:
+        assert debug is None
 
     assert response_data == expected_response_data

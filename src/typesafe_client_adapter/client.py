@@ -41,9 +41,10 @@ from typesafe_client_adapter.utils.probability_normalization import (
     AnswerMode,
     ProbabilityNormalization,
     normalize_probabilities,
-    probability_usage_data,
+    probability_debug_data,
     to_distribution,
 )
+from typesafe_client_adapter.utils.provider_debug import ProviderDebugModel
 from typesafe_client_adapter.utils.pydantic_utils import (
     Question,
     create_llm_output_model,
@@ -129,6 +130,7 @@ class _Evaluation:
     model_name: str
     questions: dict[str, Question]
     pydantic_agent: Agent
+    provider_debug_model: ProviderDebugModel
     llm_answer_mode: AnswerMode
     should_normalize_probabilities: bool
     run_usage: RunUsage = field(default_factory=RunUsage)
@@ -180,11 +182,14 @@ class _Evaluation:
             "n_retries_malformed_structure": n_retries_malformed_structure,
             "latency": latency,
         }
-        usage_data.update(probability_usage_data(probability_normalizations))
         return SystemOneResponse(
             model=self.model_name,
             answers=answers,
             usage=Usage(**usage_data),
+            debug={
+                **probability_debug_data(probability_normalizations),
+                "query": self.provider_debug_model.query,
+            },
         )
 
 
@@ -232,7 +237,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
             prepared_questions,
             self.llm_answer_mode,
         )
-        pydantic_agent = create_pydantic_ai_agent(
+        pydantic_agent, provider_debug_model = create_pydantic_ai_agent(
             model,
             output_model,
             self.structured_outputs,
@@ -243,6 +248,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
             model_name=get_model_name(model),
             questions=prepared_questions,
             pydantic_agent=pydantic_agent,
+            provider_debug_model=provider_debug_model,
             llm_answer_mode=self.llm_answer_mode,
             should_normalize_probabilities=self.normalize_probabilities,
         )

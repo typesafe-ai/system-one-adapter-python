@@ -88,10 +88,29 @@ LLM response:
     "output_tokens": 91,
     "n_retries": 0,
     "n_retries_malformed_structure": 0,
-    "latency": 0.74,
+    "latency": 0.74
+  },
+  "debug": {
     "max_error": 0.0,
     "invalid_probs": 0,
-    "probability_errors": {}
+    "probability_errors": {},
+    "query": [
+      {
+        "llm_query": {
+          "messages": ["PydanticAI system and user messages"],
+          "model_settings": null,
+          "model_request_parameters": {
+            "output_mode": "prompted",
+            "output_object": {"json_schema": {"type": "object"}}
+          }
+        },
+        "llm_response": {"kind": "response", "parts": []},
+        "debug_info": {
+          "model_name": "gpt-4o-mini",
+          "provider": "openai"
+        }
+      }
+    ]
   }
 }
 ```
@@ -148,10 +167,15 @@ TypeSafe response:
   - `n_retries` counts retries of transient provider failures
   - `n_retries_malformed_structure` counts PydanticAI corrective retries for malformed output
   - `latency` is end-to-end request latency in seconds, including retries
+- Debugging
   - `max_error` is the largest probability distribution-sum error
   - `invalid_probs` counts answers whose probability error exceeds `1e-6`
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
+  - `query` contains one entry per LLM provider attempt, including malformed-output and transient-failure retries
+    - `llm_query` contains the raw PydanticAI messages, model settings, and request parameters, including the structured-output schema
+    - `llm_response` contains the raw provider response, or `null` when the provider raised an error
+    - `debug_info` contains provider identity and error details when applicable
 - Probability normalization
   - `normalize_probabilities=False` preserves LLM probabilities and only reports errors
   - `normalize_probabilities=True` renormalizes score and choice distributions
@@ -168,7 +192,7 @@ TypeSafe response:
   - `TypeSafeClientAdapter` subclasses `TypeSafeClient`
   - supports synchronous and asynchronous `system_one`, context management, `close`, and `aclose`
   - accepts the same documents and question models and returns the same response models
-- `SystemOneResponse` includes `.model`, `.answers`, and `.usage`; each answer includes `.type`.
+- `SystemOneResponse` includes `.model`, `.answers`, `.usage`, and `.debug`; each answer includes `.type`.
 - Provider SDK exceptions are mapped onto reference-shaped error types: 
   - TypeSafeAuthError (bad key), TypeSafeTimeoutError (timeouts and connection failures) 
   - TypeSafeTokensExceededError (context window exceeded)
