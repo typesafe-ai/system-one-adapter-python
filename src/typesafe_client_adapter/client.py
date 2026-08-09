@@ -29,22 +29,22 @@ from typesafe_client.values import (
     QuestionCollectionType,
 )
 
-from open_typesafe_client.utils.confidence_metrics import (
+from typesafe_client_adapter.utils.confidence_metrics import (
     choice_confidence,
     score_confidence,
 )
-from open_typesafe_client.utils.error_handling import (
+from typesafe_client_adapter.utils.error_handling import (
     run_with_retries,
     run_with_retries_async,
 )
-from open_typesafe_client.utils.probability_normalization import (
+from typesafe_client_adapter.utils.probability_normalization import (
     AnswerMode,
     ProbabilityNormalization,
     normalize_probabilities,
     probability_usage_data,
     to_distribution,
 )
-from open_typesafe_client.utils.pydantic_utils import (
+from typesafe_client_adapter.utils.pydantic_utils import (
     Question,
     create_llm_output_model,
     create_pydantic_ai_agent,
@@ -188,7 +188,7 @@ class _Evaluation:
         )
 
 
-class OpenTypeSafeClient(TypeSafeClient):
+class TypeSafeClientAdapter(TypeSafeClient):
     """Evaluate TypeSafe questions through any PydanticAI model.
 
     :param structured_outputs: Use the provider's native structured-output mode.

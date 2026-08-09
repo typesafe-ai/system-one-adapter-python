@@ -19,12 +19,12 @@ from typesafe_client.api.api_client import (
 )
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
-from open_typesafe_client import OpenTypeSafeClient
-from open_typesafe_client.utils.confidence_metrics import (
+from typesafe_client_adapter import TypeSafeClientAdapter
+from typesafe_client_adapter.utils.confidence_metrics import (
     choice_confidence,
     score_confidence,
 )
-from open_typesafe_client.utils.error_handling import run_with_retries
+from typesafe_client_adapter.utils.error_handling import run_with_retries
 
 QUESTIONS = {
     "positive": NoulQuestion(instructions="The review is positive."),
@@ -37,7 +37,7 @@ QUESTIONS = {
 
 
 def test_client_is_typesafe_client():
-    assert issubclass(OpenTypeSafeClient, TypeSafeClient)
+    assert issubclass(TypeSafeClientAdapter, TypeSafeClient)
 
 
 @pytest.mark.parametrize(
@@ -104,7 +104,7 @@ def model_response(response_data, expected_output_mode, expected_descriptions=()
     ],
 )
 def test_system_one(answer_mode, response_data, async_call, structured_outputs):
-    client = OpenTypeSafeClient(
+    client = TypeSafeClientAdapter(
         structured_outputs=structured_outputs,
         llm_answer_mode=answer_mode,
     )
@@ -206,7 +206,7 @@ def test_probability_validation(
             "genre": {"fiction": raw_probability, "nonfiction": raw_probability},
         }
     }
-    response = OpenTypeSafeClient(
+    response = TypeSafeClientAdapter(
         normalize_probabilities=normalize_probabilities
     ).system_one(model_response(response_data, "prompted"), "document", QUESTIONS)
 
@@ -277,7 +277,7 @@ def test_provider_errors(make_error, error_type, expected_status_code):
     model = FunctionModel(fail, model_name="test-model")
 
     with pytest.raises(error_type) as raised:
-        OpenTypeSafeClient().system_one(
+        TypeSafeClientAdapter().system_one(
             model, "document", {"answer": QUESTIONS["positive"]}
         )
 
@@ -302,7 +302,7 @@ def test_transient_errors_are_retried(async_call):
 
     model = FunctionModel(respond, model_name="test-model")
     retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
-    client = OpenTypeSafeClient(retry=retry)
+    client = TypeSafeClientAdapter(retry=retry)
     questions = {"answer": QUESTIONS["positive"]}
 
     if async_call:
@@ -326,7 +326,7 @@ def test_retries_are_exhausted(async_call):
 
     model = FunctionModel(respond, model_name="test-model")
     retry = RetryConfig(max_attempts=3, initial_backoff=0, jitter=False)
-    client = OpenTypeSafeClient(retry=retry)
+    client = TypeSafeClientAdapter(retry=retry)
     questions = {"answer": QUESTIONS["positive"]}
 
     with pytest.raises(TypeSafeUnknownError) as raised:
@@ -363,7 +363,7 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
 
     model = FunctionModel(respond, model_name="test-model")
     retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
-    client = OpenTypeSafeClient(retry=retry, n_retry_malformed_structure=1)
+    client = TypeSafeClientAdapter(retry=retry, n_retry_malformed_structure=1)
     questions = {"answer": QUESTIONS["positive"]}
 
     if async_call:
@@ -396,7 +396,7 @@ def test_invalid_questions_are_rejected(questions):
     model = model_response({"answers": {}}, expected_output_mode="prompted")
 
     with pytest.raises(ValueError):
-        OpenTypeSafeClient().system_one(model, "document", questions)
+        TypeSafeClientAdapter().system_one(model, "document", questions)
 
 
 @pytest.mark.parametrize("status_code", [408, 504])
@@ -438,7 +438,7 @@ def test_malformed_structure_is_retried():
         )
 
     model = FunctionModel(respond, model_name="test-model")
-    response = OpenTypeSafeClient(n_retry_malformed_structure=1).system_one(
+    response = TypeSafeClientAdapter(n_retry_malformed_structure=1).system_one(
         model,
         "document",
         {"answer": QUESTIONS["positive"]},

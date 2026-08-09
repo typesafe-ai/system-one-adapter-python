@@ -1,4 +1,4 @@
-OpenTypeSafe is a library that is a drop-in replacement for the TypeSafeClient and API, but using LLM APIs.
+TypeSafeClientAdapter is a library that is a drop-in replacement for the TypeSafeClient and API, but using LLM APIs.
 
 It's main uses cases are
  - Evaluating TypeSafe's API vs an LLM API for cost/speed/intelligence
@@ -7,7 +7,7 @@ It's main uses cases are
 ## Usage
 
 ```python
-from open_typesafe_client import OpenTypeSafeClient
+from typesafe_client_adapter import TypeSafeClientAdapter
 from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import (
     NoulQuestion,
@@ -15,9 +15,9 @@ from typesafe_client.api.models import (
     ChoiceQuestion,
 )
 
-# OpenTypeSafeClient has the same system_one interface as TypeSafeClient.
+# TypeSafeClientAdapter has the same system_one interface as TypeSafeClient.
 # Its constructor selects structured-output and answer modes.
-open_typesafe_client = OpenTypeSafeClient()
+typesafe_client_adapter = TypeSafeClientAdapter()
 typesafe_client = TypeSafeClient()
 
 document = "This book has been a delight to read! Looking forward to the next one!"
@@ -43,7 +43,7 @@ questions = {
     ),
 }
 
-llm_response = open_typesafe_client.system_one("gpt-4o-mini", document, questions)
+llm_response = typesafe_client_adapter.system_one("gpt-4o-mini", document, questions)
 typesafe_response = typesafe_client.system_one("speed_latest", document, questions)
 
 # llm_response will have a nearly identical shape to typesafe_response
@@ -165,7 +165,7 @@ TypeSafe response:
   - re-record with `uv run pytest tests/test_live_apis.py --record-mode=rewrite`, which makes real billable calls and needs `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `TYPESAFE_API_KEY`
   - request/response credentials are stripped at record time (see `tests/conftest.py`); matching includes the request body because every call posts to the same endpoint
 - Compatibility scope
-  - `OpenTypeSafeClient` subclasses `TypeSafeClient`
+  - `TypeSafeClientAdapter` subclasses `TypeSafeClient`
   - supports synchronous and asynchronous `system_one`, context management, `close`, and `aclose`
   - accepts the same documents and question models and returns the same response models
 - `SystemOneResponse` includes `.model`, `.answers`, and `.usage`; each answer includes `.type`.
@@ -175,7 +175,7 @@ TypeSafe response:
   - TypeSafeUnknownError (everything else, carrying the HTTP status_code)
   - All inherit from TypeSafeApiError
 
-class OpenTypeSafeClient(TypeSafeClient):
+class TypeSafeClientAdapter(TypeSafeClient):
    def __init__(
       self, 
       structured_outputs: bool = False,
