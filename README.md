@@ -135,17 +135,21 @@ LLM response:
     "probability_errors": {},
     "llm_queries": [
       {
-        "messages": ["PydanticAI system and user messages"],
-        "model_settings": null,
-        "model_request_parameters": {
-          "output_mode": "prompted",
-          "output_object": {"json_schema": {"type": "object"}}
-        },
-        "llm_response": {"kind": "response", "parts": []},
-        "debug_info": {
-          "model_name": "gpt-4o-mini",
-          "provider": "openai"
-        }
+        "model": "gpt-4o-mini",
+        "input": ["Final provider HTTP request messages"],
+        "text": {"format": {"type": "json_object"}}
+      }
+    ],
+    "llm_responses": [
+      {"id": "response-id", "output": []}
+    ],
+    "debug_info": [
+      {
+        "model_name": "gpt-4o-mini",
+        "provider": "openai",
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "status_code": 200
       }
     ]
   }
@@ -170,10 +174,9 @@ LLM response:
   - `invalid_probs` counts answers whose probability error exceeds `1e-6`
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
-  - `llm_queries` contains one entry per LLM provider attempt, including malformed-output and transient-failure retries
-    - each query contains the raw PydanticAI messages, model settings, and request parameters, including the structured-output schema
-    - `llm_response` contains the raw provider response, or `null` when the provider raised an error
-    - `debug_info` contains provider identity and error details when applicable
+  - `llm_queries` contains the final JSON HTTP request body for each provider attempt
+  - `llm_responses` contains the matching raw JSON HTTP response body, or `null` when no response arrived
+  - `debug_info` contains matching provider, endpoint, status, and error metadata
 - Probability normalization
   - `normalize_probabilities=False` preserves LLM probabilities and only reports errors
   - `normalize_probabilities=True` renormalizes score and choice distributions

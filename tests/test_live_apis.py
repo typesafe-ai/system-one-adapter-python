@@ -7,8 +7,8 @@ this client builds and the response it parses are both exercised for real.
 
 Cassettes live in ``tests/cassettes`` and are replayed by default, so the whole client
 stack runs against recorded provider traffic without credentials or network access.
-Complete normalized responses live in ``tests/expected_responses``. Only volatile
-debug timestamps, run IDs, and conversation IDs use ``<dynamic>`` placeholders.
+Complete responses, including provider HTTP bodies, live in
+``tests/expected_responses``.
 Re-record after changing prompts, schemas, or providers::
 
     uv run pytest tests/test_live_apis.py --record-mode=rewrite
@@ -19,7 +19,6 @@ Recording makes real, billable API calls and needs ``OPENAI_API_KEY``,
 
 import json
 import os
-from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -49,25 +48,6 @@ QUESTIONS = {
         },
     ),
 }
-
-_DYNAMIC_DEBUG_FIELDS = frozenset({"timestamp", "run_id", "conversation_id"})
-
-
-def _normalize_response_data(value):
-    """Replace volatile provider-call values while retaining the complete response."""
-    if isinstance(value, dict):
-        return {
-            key: (
-                "<dynamic>"
-                if key in _DYNAMIC_DEBUG_FIELDS and item is not None
-                else _normalize_response_data(item)
-            )
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_normalize_response_data(item) for item in value]
-    return value
-
 
 @pytest.mark.vcr
 @pytest.mark.parametrize(
@@ -107,11 +87,10 @@ def test_live_responses_match_reference_shape(
 ):
     response = client.system_one(model, DOCUMENT, QUESTIONS)
     response_data = response.model_dump(mode="json")
-    normalized_response_data = _normalize_response_data(deepcopy(response_data))
 
     # Latency is wall-clock and so never reproducible; assert it is plausible and drop
     # it rather than pinning a recorded value that the next run cannot match.
-    latency = normalized_response_data["usage"].pop("latency", None)
+    latency = response_data["usage"].pop("latency", None)
     if latency is not None:
         assert 0 < latency < 120
 
@@ -120,8 +99,8 @@ def test_live_responses_match_reference_shape(
         / f"{request.node.callspec.id}.json"
     )
     expected_response_data = json.loads(expected_response_path.read_text())
-    assert normalized_response_data == expected_response_data
-    assert json.dumps(normalized_response_data, sort_keys=True) == json.dumps(
+    assert response_data == expected_response_data
+    assert json.dumps(response_data, sort_keys=True) == json.dumps(
         expected_response_data,
         sort_keys=True,
     )

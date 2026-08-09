@@ -60,7 +60,7 @@ def test_confidence_metrics(confidence_metric, probabilities, expected_confidenc
 def model_response(response_data, expected_output_mode, expected_descriptions=()):
     """Return a local model producing ``response_data`` in the requested output mode."""
 
-    def respond(messages, agent_info):
+    def return_configured_model_response(messages, agent_info):
         parameters = agent_info.model_request_parameters
         assert parameters.output_mode == expected_output_mode
         output_schema = parameters.output_object.json_schema
@@ -76,7 +76,7 @@ def model_response(response_data, expected_output_mode, expected_descriptions=()
         )
 
     return FunctionModel(
-        respond,
+        return_configured_model_response,
         model_name="test-model",
         profile={"supports_json_schema_output": True},
     )
@@ -161,15 +161,15 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert response.debug["invalid_probs"] == 0
     assert response.debug["probability_errors"] == {}
 
-    query_entry = response.debug["llm_queries"][0]
-    serialized_messages = json.dumps(query_entry["messages"])
+    llm_query = response.debug["llm_queries"][0]
+    serialized_messages = json.dumps(llm_query["messages"])
     assert "Evaluate every question" in serialized_messages
     assert "A delightful novel." in serialized_messages
-    request_parameters = query_entry["model_request_parameters"]
+    request_parameters = llm_query["model_request_parameters"]
     assert request_parameters["output_mode"] == expected_output_mode
     assert "positive" in json.dumps(request_parameters["output_object"])
-    assert query_entry["llm_response"]["kind"] == "response"
-    assert query_entry["debug_info"]["model_name"] == "test-model"
+    assert response.debug["llm_responses"][0]["kind"] == "response"
+    assert response.debug["debug_info"][0]["model_name"] == "test-model"
 
 
 @pytest.mark.parametrize(
@@ -284,10 +284,10 @@ def test_probability_validation(
     ],
 )
 def test_provider_errors(make_error, error_type, expected_status_code):
-    def fail(messages, agent_info):
+    def raise_configured_provider_error(messages, agent_info):
         raise make_error()
 
-    model = FunctionModel(fail, model_name="test-model")
+    model = FunctionModel(raise_configured_provider_error, model_name="test-model")
 
     with pytest.raises(error_type) as raised:
         TypeSafeClientAdapter().system_one(
@@ -306,14 +306,14 @@ def test_transient_errors_are_retried(async_call):
         {"answers": {"answer": 0.75}}, expected_output_mode="prompted"
     )
 
-    def respond(messages, agent_info):
+    def fail_first_provider_attempt(messages, agent_info):
         nonlocal calls
         calls += 1
         if calls == 1:
             raise ModelHTTPError(503, "test-model", {"message": "unavailable"})
         return success_model.function(messages, agent_info)
 
-    model = FunctionModel(respond, model_name="test-model")
+    model = FunctionModel(fail_first_provider_attempt, model_name="test-model")
     retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
     client = TypeSafeClientAdapter(retry=retry)
     questions = {"answer": QUESTIONS["positive"]}
@@ -327,24 +327,24 @@ def test_transient_errors_are_retried(async_call):
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 0
     assert len(response.debug["llm_queries"]) == 2
-    assert response.debug["llm_queries"][0]["llm_response"] is None
+    assert response.debug["llm_responses"][0] is None
     assert (
-        response.debug["llm_queries"][0]["debug_info"]["error_type"]
+        response.debug["debug_info"][0]["error_type"]
         == "ModelHTTPError"
     )
-    assert response.debug["llm_queries"][1]["llm_response"]["kind"] == "response"
+    assert response.debug["llm_responses"][1]["kind"] == "response"
 
 
 @pytest.mark.parametrize("async_call", [False, True])
 def test_retries_are_exhausted(async_call):
     calls = 0
 
-    def respond(messages, agent_info):
+    def raise_retryable_provider_error(messages, agent_info):
         nonlocal calls
         calls += 1
         raise ModelHTTPError(503, "test-model", {"message": "unavailable"})
 
-    model = FunctionModel(respond, model_name="test-model")
+    model = FunctionModel(raise_retryable_provider_error, model_name="test-model")
     retry = RetryConfig(max_attempts=3, initial_backoff=0, jitter=False)
     client = TypeSafeClientAdapter(retry=retry)
     questions = {"answer": QUESTIONS["positive"]}
@@ -364,7 +364,7 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
     """Tokens burned by an attempt that later failed are still billed to the caller."""
     calls = 0
 
-    def respond(messages, agent_info):
+    def simulate_malformed_transient_then_successful_attempts(messages, agent_info):
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -381,7 +381,10 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
             usage=RequestUsage(input_tokens=100, output_tokens=50),
         )
 
-    model = FunctionModel(respond, model_name="test-model")
+    model = FunctionModel(
+        simulate_malformed_transient_then_successful_attempts,
+        model_name="test-model",
+    )
     retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
     client = TypeSafeClientAdapter(retry=retry, n_retry_malformed_structure=1)
     questions = {"answer": QUESTIONS["positive"]}
@@ -429,7 +432,7 @@ def test_status_errors_are_retried(status_code):
 
     calls = 0
 
-    def respond():
+    def fail_first_status_attempt():
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -437,7 +440,7 @@ def test_status_errors_are_retried(status_code):
         return "success"
 
     result, n_retries = run_with_retries(
-        respond,
+        fail_first_status_attempt,
         RetryConfig(max_attempts=2, initial_backoff=0, jitter=False),
     )
 
@@ -449,7 +452,7 @@ def test_status_errors_are_retried(status_code):
 def test_malformed_structure_is_retried():
     calls = 0
 
-    def respond(messages, agent_info):
+    def return_malformed_then_valid_response(messages, agent_info):
         nonlocal calls
         calls += 1
         answers = {} if calls == 1 else {"answer": 0.75}
@@ -458,7 +461,10 @@ def test_malformed_structure_is_retried():
             usage=RequestUsage(input_tokens=11, output_tokens=7),
         )
 
-    model = FunctionModel(respond, model_name="test-model")
+    model = FunctionModel(
+        return_malformed_then_valid_response,
+        model_name="test-model",
+    )
     response = TypeSafeClientAdapter(n_retry_malformed_structure=1).system_one(
         model,
         "document",
