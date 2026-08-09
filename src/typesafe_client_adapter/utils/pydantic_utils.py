@@ -11,6 +11,7 @@ from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuesti
 from typesafe_client.values import QuestionCollectionType, question_to_api_model
 
 from typesafe_client_adapter.utils.probability_normalization import AnswerMode
+from typesafe_client_adapter.utils.provider_debug import ProviderDebugModel
 
 Probability: TypeAlias = Annotated[float, Field(ge=0, le=1)]
 Question: TypeAlias = NoulQuestion | ScoreQuestion | ChoiceQuestion
@@ -50,7 +51,7 @@ def create_llm_output_model(
     """
     fields = {}
     for index, (question_id, question) in enumerate(questions.items()):
-        answer_type = _create_question_output_type(
+        answer_type = _create_llm_answer_type_for_question(
             index,
             question,
             llm_answer_mode,
@@ -59,7 +60,10 @@ def create_llm_output_model(
             answer_type,
             Field(
                 alias=question_id,
-                description=_build_question_description(question, llm_answer_mode),
+                description=_build_llm_output_field_description(
+                    question,
+                    llm_answer_mode,
+                ),
             ),
         )
 
@@ -91,7 +95,7 @@ def create_pydantic_ai_agent(
     structured_outputs: bool,
     n_retry_malformed_structure: int,
     instructions: str,
-) -> Agent:
+) -> tuple[Agent, ProviderDebugModel]:
     """Create the configured PydanticAI agent.
 
     :param model: PydanticAI model or model name.
@@ -99,19 +103,23 @@ def create_pydantic_ai_agent(
     :param structured_outputs: Whether to use native structured output.
     :param n_retry_malformed_structure: Output validation retry count.
     :param instructions: Agent system instructions.
-    :return: Configured agent.
+    :return: Configured agent and its provider debug wrapper.
     """
     requested_output: Any = (
         NativeOutput(output_model)
         if structured_outputs
         else PromptedOutput(output_model)
     )
-    return Agent(
-        _resolve_pydantic_ai_model(model),
+    provider_debug_model = ProviderDebugModel(
+        _resolve_provider_prefixed_pydantic_ai_model(model)
+    )
+    pydantic_agent = Agent(
+        provider_debug_model,
         output_type=requested_output,
         instructions=instructions,
         retries={"output": n_retry_malformed_structure},
     )
+    return pydantic_agent, provider_debug_model
 
 
 def get_model_name(model: str | Model) -> str:
@@ -119,7 +127,7 @@ def get_model_name(model: str | Model) -> str:
     return model if isinstance(model, str) else model.model_name
 
 
-def _create_question_output_type(
+def _create_llm_answer_type_for_question(
     index: int,
     question: Question,
     llm_answer_mode: AnswerMode,
@@ -131,8 +139,11 @@ def _create_question_output_type(
         if llm_answer_mode == "discrete":
             return Annotated[int, Field(ge=0, lt=len(question.criteria))]
         labels = [str(score) for score in range(len(question.criteria))]
-        descriptions = [_serialize_instructions(value) for value in question.criteria]
-        return _create_probability_model(
+        descriptions = [
+            _serialize_instruction_value_for_prompt(value)
+            for value in question.criteria
+        ]
+        return _create_probability_output_model_for_labels(
             f"ScoreProbabilities{index}", labels, descriptions
         )
 
@@ -140,14 +151,15 @@ def _create_question_output_type(
     if llm_answer_mode == "discrete":
         return Literal.__getitem__(tuple(labels))
     descriptions = [
-        _serialize_instructions(value) for value in question.criteria.values()
+        _serialize_instruction_value_for_prompt(value)
+        for value in question.criteria.values()
     ]
-    return _create_probability_model(
+    return _create_probability_output_model_for_labels(
         f"ChoiceProbabilities{index}", labels, descriptions
     )
 
 
-def _create_probability_model(
+def _create_probability_output_model_for_labels(
     name: str,
     labels: list[str],
     descriptions: list[str],
@@ -168,22 +180,22 @@ def _create_probability_model(
     )
 
 
-def _build_question_description(
+def _build_llm_output_field_description(
     question: Question,
     llm_answer_mode: AnswerMode,
 ) -> str:
-    description = _serialize_instructions(question.instructions)
+    description = _serialize_instruction_value_for_prompt(question.instructions)
     if llm_answer_mode == "discrete":
         if isinstance(question, ScoreQuestion):
             levels = "\n".join(
-                f"{score} = {_serialize_instructions(criterion)}"
+                f"{score} = {_serialize_instruction_value_for_prompt(criterion)}"
                 for score, criterion in enumerate(question.criteria)
             )
             return f"{description}\nScore levels, answer with the integer:\n{levels}"
 
         if isinstance(question, ChoiceQuestion):
             choices = "\n".join(
-                f"{label} = {_serialize_instructions(criterion)}"
+                f"{label} = {_serialize_instruction_value_for_prompt(criterion)}"
                 for label, criterion in question.criteria.items()
             )
             return f"{description}\nChoice labels, answer with one label:\n{choices}"
@@ -191,15 +203,15 @@ def _build_question_description(
     if not isinstance(question, NoulQuestion) or question.criteria is None:
         return description
 
-    true_criteria = _serialize_instructions(question.criteria.true)
-    false_criteria = _serialize_instructions(question.criteria.false)
+    true_criteria = _serialize_instruction_value_for_prompt(question.criteria.true)
+    false_criteria = _serialize_instruction_value_for_prompt(question.criteria.false)
     return (
         f"{description}\nTrue criteria: {true_criteria}\n"
         f"False criteria: {false_criteria}"
     )
 
 
-def _serialize_instructions(value: Any) -> str:
+def _serialize_instruction_value_for_prompt(value: Any) -> str:
     if value is None:
         return "No additional instructions."
     if isinstance(value, str):
@@ -207,7 +219,7 @@ def _serialize_instructions(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
-def _resolve_pydantic_ai_model(model: str | Model) -> str | Model:
+def _resolve_provider_prefixed_pydantic_ai_model(model: str | Model) -> str | Model:
     if not isinstance(model, str) or ":" in model:
         return model
     if model.startswith(("gpt-", "chatgpt-", "o1", "o3", "o4")):

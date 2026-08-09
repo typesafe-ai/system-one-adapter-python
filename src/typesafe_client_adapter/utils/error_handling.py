@@ -93,21 +93,26 @@ def _raise_for_nonretryable(
     :param attempt: Current one-based attempt number.
     :param max_attempts: Maximum provider attempts.
     """
-    mapped_error = _map_error(error)
-    if attempt >= max_attempts or not _retryable(error, mapped_error):
+    mapped_error = _map_provider_exception_to_typesafe_api_error(error)
+    if attempt >= max_attempts or not _is_retryable_provider_exception(
+        error,
+        mapped_error,
+    ):
         raise mapped_error from error
 
 
-def _map_error(error: Exception) -> TypeSafeApiError:
+def _map_provider_exception_to_typesafe_api_error(
+    error: Exception,
+) -> TypeSafeApiError:
     if isinstance(error, TypeSafeApiError):
         return error
 
-    chain = _error_chain(error)
+    chain = _collect_exception_cause_chain(error)
     detail = {"message": str(error)}
     if any(isinstance(item, _AUTH_ERRORS) for item in chain):
         return TypeSafeAuthError(detail)
 
-    status_code = _status_code(chain)
+    status_code = _find_http_status_code_in_exception_chain(chain)
     if status_code in (401, 403):
         return TypeSafeAuthError(detail)
     if any(isinstance(item, _CONNECTION_ERRORS) for item in chain) or status_code in (
@@ -122,18 +127,24 @@ def _map_error(error: Exception) -> TypeSafeApiError:
     return TypeSafeUnknownError(detail, status_code)
 
 
-def _retryable(error: Exception, mapped_error: TypeSafeApiError) -> bool:
-    chain = _error_chain(error)
+def _is_retryable_provider_exception(
+    error: Exception,
+    mapped_error: TypeSafeApiError,
+) -> bool:
+    chain = _collect_exception_cause_chain(error)
     if any(isinstance(item, _CONNECTION_ERRORS) for item in chain):
         return True
-    if _status_code(chain) in TypeSafeUnknownError.retryable_status_codes:
+    if (
+        _find_http_status_code_in_exception_chain(chain)
+        in TypeSafeUnknownError.retryable_status_codes
+    ):
         return True
     return (
         isinstance(mapped_error, TypeSafeUnknownError) and mapped_error.is_retryable()
     )
 
 
-def _error_chain(error: Exception) -> list[BaseException]:
+def _collect_exception_cause_chain(error: Exception) -> list[BaseException]:
     chain: list[BaseException] = []
     current: BaseException | None = error
     while current is not None and current not in chain:
@@ -142,7 +153,9 @@ def _error_chain(error: Exception) -> list[BaseException]:
     return chain
 
 
-def _status_code(chain: list[BaseException]) -> int | None:
+def _find_http_status_code_in_exception_chain(
+    chain: list[BaseException],
+) -> int | None:
     return next(
         (item.status_code for item in chain if hasattr(item, "status_code")),
         None,

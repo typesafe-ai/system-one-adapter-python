@@ -1,0 +1,41 @@
+{
+  "model": "speed_v10_mango_loco",
+  "answers": {
+    "positive": {
+      "type": "noul",
+      "noul": 0.99
+    },
+    "stars": {
+      "type": "score",
+      "score": 3.15,
+      "confidence": 0.86,
+      "probabilities": {
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.01,
+        "3": 0.83,
+        "4": 0.16
+      },
+      "legend": {
+        "0": "Horrendous. Unreadable garbage.",
+        "1": "Pretty bad, but theoretically readable.",
+        "2": "Acceptable, but just barely.",
+        "3": "Pretty good. Worth reading but not perfect.",
+        "4": "Transcendent and impactful. A must read."
+      }
+    },
+    "genre": {
+      "type": "choice",
+      "choice": "fiction",
+      "confidence": 0.79,
+      "probabilities": {
+        "fiction": 0.89,
+        "nonfiction": 0.11
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 396,
+    "output_tokens": 55
+  }
+}

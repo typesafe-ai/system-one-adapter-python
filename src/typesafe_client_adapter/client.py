@@ -41,9 +41,10 @@ from typesafe_client_adapter.utils.probability_normalization import (
     AnswerMode,
     ProbabilityNormalization,
     normalize_probabilities,
-    probability_usage_data,
+    probability_debug_data,
     to_distribution,
 )
+from typesafe_client_adapter.utils.provider_debug import ProviderDebugModel
 from typesafe_client_adapter.utils.pydantic_utils import (
     Question,
     create_llm_output_model,
@@ -56,15 +57,14 @@ Answer = NoulAnswer | ScoreAnswer | ChoiceAnswer
 
 _SYSTEM_PROMPT = """Evaluate every question using only the supplied document.
 Return every requested answer. Probability objects are complete probability
-distributions: every value is between 0 and 1 and the values sum to 1.
-Do not add facts which are not supported by the document."""
+distributions: every value is between 0 and 1 and the values sum to 1."""
 
 
-def _prompt(document: InstructionValue) -> str:
+def _serialize_document_as_user_prompt(document: InstructionValue) -> str:
     return "Document:\n" + json.dumps(document, ensure_ascii=False, sort_keys=True)
 
 
-def _answer(
+def _convert_llm_value_to_typesafe_answer(
     question: Question,
     value: Any,
     llm_answer_mode: AnswerMode,
@@ -129,6 +129,7 @@ class _Evaluation:
     model_name: str
     questions: dict[str, Question]
     pydantic_agent: Agent
+    provider_debug_model: ProviderDebugModel
     llm_answer_mode: AnswerMode
     should_normalize_probabilities: bool
     run_usage: RunUsage = field(default_factory=RunUsage)
@@ -159,7 +160,7 @@ class _Evaluation:
             ProbabilityNormalization | None,
         ] = {}
         for question_id, question in self.questions.items():
-            answer, probability_normalization = _answer(
+            answer, probability_normalization = _convert_llm_value_to_typesafe_answer(
                 question,
                 raw_answers[question_id],
                 self.llm_answer_mode,
@@ -180,11 +181,16 @@ class _Evaluation:
             "n_retries_malformed_structure": n_retries_malformed_structure,
             "latency": latency,
         }
-        usage_data.update(probability_usage_data(probability_normalizations))
         return SystemOneResponse(
             model=self.model_name,
             answers=answers,
             usage=Usage(**usage_data),
+            debug={
+                **probability_debug_data(probability_normalizations),
+                "llm_queries": self.provider_debug_model.llm_queries,
+                "llm_responses": self.provider_debug_model.llm_responses,
+                "debug_info": self.provider_debug_model.debug_info,
+            },
         )
 
 
@@ -232,7 +238,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
             prepared_questions,
             self.llm_answer_mode,
         )
-        pydantic_agent = create_pydantic_ai_agent(
+        pydantic_agent, provider_debug_model = create_pydantic_ai_agent(
             model,
             output_model,
             self.structured_outputs,
@@ -243,6 +249,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
             model_name=get_model_name(model),
             questions=prepared_questions,
             pydantic_agent=pydantic_agent,
+            provider_debug_model=provider_debug_model,
             llm_answer_mode=self.llm_answer_mode,
             should_normalize_probabilities=self.normalize_probabilities,
         )
@@ -256,15 +263,21 @@ class TypeSafeClientAdapter(TypeSafeClient):
         """Synchronously evaluate ``questions`` against one ``document``."""
         evaluation = self._evaluation(model, questions)
 
-        def attempt() -> Any:
+        def run_pydantic_agent_attempt() -> Any:
             evaluation.begin_attempt()
             return evaluation.pydantic_agent.run_sync(
-                _prompt(document),
+                _serialize_document_as_user_prompt(document),
                 usage=evaluation.run_usage,
             )
 
-        result, n_retries = run_with_retries(attempt, self.retry)
-        return evaluation.response(cast(BaseModel, result.output), n_retries)
+        try:
+            result, n_retries = run_with_retries(
+                run_pydantic_agent_attempt,
+                self.retry,
+            )
+            return evaluation.response(cast(BaseModel, result.output), n_retries)
+        finally:
+            evaluation.provider_debug_model.remove_http_hooks()
 
     async def system_one_async(
         self,
@@ -275,15 +288,21 @@ class TypeSafeClientAdapter(TypeSafeClient):
         """Asynchronously evaluate ``questions`` against one ``document``."""
         evaluation = self._evaluation(model, questions)
 
-        def attempt() -> Any:
+        def run_pydantic_agent_attempt_async() -> Any:
             evaluation.begin_attempt()
             return evaluation.pydantic_agent.run(
-                _prompt(document),
+                _serialize_document_as_user_prompt(document),
                 usage=evaluation.run_usage,
             )
 
-        result, n_retries = await run_with_retries_async(attempt, self.retry)
-        return evaluation.response(cast(BaseModel, result.output), n_retries)
+        try:
+            result, n_retries = await run_with_retries_async(
+                run_pydantic_agent_attempt_async,
+                self.retry,
+            )
+            return evaluation.response(cast(BaseModel, result.output), n_retries)
+        finally:
+            evaluation.provider_debug_model.remove_http_hooks()
 
     def close(self) -> None:
         """Close the client.

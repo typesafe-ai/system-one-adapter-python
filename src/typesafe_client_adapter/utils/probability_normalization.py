@@ -18,16 +18,16 @@ class ProbabilityNormalization:
     original_probabilities: dict[str, float] | None = None
 
 
-def probability_usage_data(
+def probability_debug_data(
     probability_normalizations: Mapping[
         str,
         ProbabilityNormalization | None,
     ],
 ) -> dict[str, Any]:
-    """Build usage telemetry from question normalization results.
+    """Build probability diagnostics from question normalization results.
 
     :param probability_normalizations: Results keyed by question identifier.
-    :return: Probability-related ``Usage`` fields.
+    :return: Probability-related debug fields.
     """
     errors = {
         question_id: probability_normalization.error
@@ -45,14 +45,14 @@ def probability_usage_data(
         if probability_normalization is not None
         and probability_normalization.original_probabilities is not None
     }
-    usage_data: dict[str, Any] = {
+    debug_data: dict[str, Any] = {
         "max_error": max(errors.values(), default=0.0),
         "invalid_probs": len(probability_errors),
         "probability_errors": probability_errors,
     }
     if original_probabilities:
-        usage_data["original_probabilities"] = original_probabilities
-    return usage_data
+        debug_data["original_probabilities"] = original_probabilities
+    return debug_data
 
 
 def to_distribution(probabilities: dict[str, float]) -> dict[str, float]:

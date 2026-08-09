@@ -7,6 +7,8 @@ this client builds and the response it parses are both exercised for real.
 
 Cassettes live in ``tests/cassettes`` and are replayed by default, so the whole client
 stack runs against recorded provider traffic without credentials or network access.
+Complete responses, including provider HTTP bodies, live in
+``tests/expected_responses``.
 Re-record after changing prompts, schemas, or providers::
 
     uv run pytest tests/test_live_apis.py --record-mode=rewrite
@@ -15,7 +17,9 @@ Recording makes real, billable API calls and needs ``OPENAI_API_KEY``,
 ``ANTHROPIC_API_KEY``, and ``TYPESAFE_API_KEY``.
 """
 
+import json
 import os
+from pathlib import Path
 
 import pytest
 from typesafe_client import TypeSafeClient
@@ -45,236 +49,42 @@ QUESTIONS = {
     ),
 }
 
-
 @pytest.mark.vcr
 @pytest.mark.parametrize(
-    ("client", "model", "expected_response_data"),
+    ("client", "model"),
     [
         pytest.param(
             TypeSafeClientAdapter(),
             "gpt-4o-mini",
-            {
-                "model": "gpt-4o-mini",
-                "answers": {
-                    "positive": {
-                        "type": "noul",
-                        "noul": 1.0
-                    },
-                    "stars": {
-                        "type": "score",
-                        "score": 4.0,
-                        "confidence": 1.0,
-                        "probabilities": {
-                            "0": 0.0,
-                            "1": 0.0,
-                            "2": 0.0,
-                            "3": 0.0,
-                            "4": 1.0
-                        }
-                    },
-                    "genre": {
-                        "type": "choice",
-                        "choice": "fiction",
-                        "confidence": 1.0,
-                        "probabilities": {
-                            "fiction": 1.0,
-                            "nonfiction": 0.0
-                        }
-                    }
-                },
-                "usage": {
-                    "input_tokens": 621,
-                    "output_tokens": 42,
-                    "n_retries": 0,
-                    "n_retries_malformed_structure": 0,
-                    "max_error": 0.0,
-                    "invalid_probs": 0,
-                    "probability_errors": {}
-                }
-            },
             id="openai-probabilities",
         ),
         pytest.param(
             TypeSafeClientAdapter(llm_answer_mode="discrete"),
             "gpt-4o-mini",
-            {
-                "model": "gpt-4o-mini",
-                "answers": {
-                    "positive": {
-                        "type": "noul",
-                        "noul": 1.0
-                    },
-                    "stars": {
-                        "type": "score",
-                        "score": 4.0,
-                        "confidence": 1.0,
-                        "probabilities": {
-                            "0": 0.0,
-                            "1": 0.0,
-                            "2": 0.0,
-                            "3": 0.0,
-                            "4": 1.0
-                        }
-                    },
-                    "genre": {
-                        "type": "choice",
-                        "choice": "fiction",
-                        "confidence": 1.0,
-                        "probabilities": {
-                            "fiction": 1.0,
-                            "nonfiction": 0.0
-                        }
-                    }
-                },
-                "usage": {
-                    "input_tokens": 365,
-                    "output_tokens": 16,
-                    "n_retries": 0,
-                    "n_retries_malformed_structure": 0,
-                    "max_error": 0.0,
-                    "invalid_probs": 0,
-                    "probability_errors": {}
-                }
-            },
             id="openai-discrete",
         ),
         pytest.param(
             TypeSafeClientAdapter(),
             "claude-haiku-4-5",
-            {
-                "model": "claude-haiku-4-5",
-                "answers": {
-                    "positive": {
-                        "type": "noul",
-                        "noul": 0.95
-                    },
-                    "stars": {
-                        "type": "score",
-                        "score": 3.1500000000000004,
-                        "confidence": 0.675,
-                        "probabilities": {
-                            "0": 0.01,
-                            "1": 0.02,
-                            "2": 0.05,
-                            "3": 0.65,
-                            "4": 0.27
-                        }
-                    },
-                    "genre": {
-                        "type": "choice",
-                        "choice": "fiction",
-                        "confidence": 0.0,
-                        "probabilities": {
-                            "fiction": 0.5,
-                            "nonfiction": 0.5
-                        }
-                    }
-                },
-                "usage": {
-                    "input_tokens": 665,
-                    "output_tokens": 118,
-                    "n_retries": 0,
-                    "n_retries_malformed_structure": 0,
-                    "max_error": 0.0,
-                    "invalid_probs": 0,
-                    "probability_errors": {}
-                }
-            },
             id="anthropic-probabilities",
         ),
         pytest.param(
             TypeSafeClientAdapter(llm_answer_mode="discrete"),
             "claude-haiku-4-5",
-            {
-                "model": "claude-haiku-4-5",
-                "answers": {
-                    "positive": {
-                        "type": "noul",
-                        "noul": 1.0
-                    },
-                    "stars": {
-                        "type": "score",
-                        "score": 3.0,
-                        "confidence": 1.0,
-                        "probabilities": {
-                            "0": 0.0,
-                            "1": 0.0,
-                            "2": 0.0,
-                            "3": 1.0,
-                            "4": 0.0
-                        }
-                    },
-                    "genre": {
-                        "type": "choice",
-                        "choice": "fiction",
-                        "confidence": 1.0,
-                        "probabilities": {
-                            "fiction": 1.0,
-                            "nonfiction": 0.0
-                        }
-                    }
-                },
-                "usage": {
-                    "input_tokens": 405,
-                    "output_tokens": 29,
-                    "n_retries": 0,
-                    "n_retries_malformed_structure": 0,
-                    "max_error": 0.0,
-                    "invalid_probs": 0,
-                    "probability_errors": {}
-                }
-            },
             id="anthropic-discrete",
         ),
         pytest.param(
             TypeSafeClient(api_key=os.environ["TYPESAFE_API_KEY"]),
             "speed_latest",
-            {
-                "model": "speed_v10_mango_loco",
-                "answers": {
-                    "positive": {
-                        "type": "noul",
-                        "noul": 0.99
-                    },
-                    "stars": {
-                        "type": "score",
-                        "score": 3.15,
-                        "confidence": 0.86,
-                        "probabilities": {
-                            "0": 0.0,
-                            "1": 0.0,
-                            "2": 0.01,
-                            "3": 0.83,
-                            "4": 0.16
-                        },
-                        "legend": {
-                            "0": "Horrendous. Unreadable garbage.",
-                            "1": "Pretty bad, but theoretically readable.",
-                            "2": "Acceptable, but just barely.",
-                            "3": "Pretty good. Worth reading but not perfect.",
-                            "4": "Transcendent and impactful. A must read."
-                        }
-                    },
-                    "genre": {
-                        "type": "choice",
-                        "choice": "fiction",
-                        "confidence": 0.79,
-                        "probabilities": {
-                            "fiction": 0.89,
-                            "nonfiction": 0.11
-                        }
-                    }
-                },
-                "usage": {
-                    "input_tokens": 396,
-                    "output_tokens": 55
-                }
-            },
             id="typesafe",
         ),
     ],
 )
-def test_live_responses_match_reference_shape(client, model, expected_response_data):
+def test_live_responses_match_reference_shape(
+    client,
+    model,
+    request,
+):
     response = client.system_one(model, DOCUMENT, QUESTIONS)
     response_data = response.model_dump(mode="json")
 
@@ -284,4 +94,13 @@ def test_live_responses_match_reference_shape(client, model, expected_response_d
     if latency is not None:
         assert 0 < latency < 120
 
+    expected_response_path = (
+        Path(__file__).with_name("expected_responses")
+        / f"{request.node.callspec.id}.json"
+    )
+    expected_response_data = json.loads(expected_response_path.read_text())
     assert response_data == expected_response_data
+    assert json.dumps(response_data, sort_keys=True) == json.dumps(
+        expected_response_data,
+        sort_keys=True,
+    )

@@ -43,57 +43,12 @@ questions = {
     ),
 }
 
-llm_response = typesafe_client_adapter.system_one("gpt-4o-mini", document, questions)
 typesafe_response = typesafe_client.system_one("speed_latest", document, questions)
+llm_response = typesafe_client_adapter.system_one("gpt-4o-mini", document, questions)
 
 # llm_response will have a nearly identical shape to typesafe_response
-print(llm_response.model_dump_json(indent=2))
 print(typesafe_response.model_dump_json(indent=2))
-```
-
-LLM response:
-
-```json
-{
-  "model": "gpt-4o-mini",
-  "answers": {
-    "positive": {
-      "type": "noul",
-      "noul": 0.96
-    },
-    "stars": {
-      "type": "score",
-      "score": 3.46,
-      "confidence": 0.55,
-      "probabilities": {
-        "0": 0.01,
-        "1": 0.02,
-        "2": 0.07,
-        "3": 0.3,
-        "4": 0.6
-      }
-    },
-    "genre": {
-      "type": "choice",
-      "choice": "fiction",
-      "confidence": 0.64,
-      "probabilities": {
-        "fiction": 0.82,
-        "nonfiction": 0.18
-      }
-    }
-  },
-  "usage": {
-    "input_tokens": 356,
-    "output_tokens": 91,
-    "n_retries": 0,
-    "n_retries_malformed_structure": 0,
-    "latency": 0.74,
-    "max_error": 0.0,
-    "invalid_probs": 0,
-    "probability_errors": {}
-  }
-}
+print(llm_response.model_dump_json(indent=2))
 ```
 
 TypeSafe response:
@@ -135,6 +90,72 @@ TypeSafe response:
 }
 ```
 
+LLM response:
+
+```json
+{
+  "model": "gpt-4o-mini",
+  "answers": {
+    "positive": {
+      "type": "noul",
+      "noul": 0.96
+    },
+    "stars": {
+      "type": "score",
+      "score": 3.46,
+      "confidence": 0.55,
+      "probabilities": {
+        "0": 0.01,
+        "1": 0.02,
+        "2": 0.07,
+        "3": 0.3,
+        "4": 0.6
+      }
+    },
+    "genre": {
+      "type": "choice",
+      "choice": "fiction",
+      "confidence": 0.64,
+      "probabilities": {
+        "fiction": 0.82,
+        "nonfiction": 0.18
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 356,
+    "output_tokens": 91,
+    "n_retries": 0,
+    "n_retries_malformed_structure": 0,
+    "latency": 0.74
+  },
+  "debug": {
+    "max_error": 0.0,
+    "invalid_probs": 0,
+    "probability_errors": {},
+    "llm_queries": [
+      {
+        "model": "gpt-4o-mini",
+        "input": ["Final provider HTTP request messages"],
+        "text": {"format": {"type": "json_object"}}
+      }
+    ],
+    "llm_responses": [
+      {"id": "response-id", "output": []}
+    ],
+    "debug_info": [
+      {
+        "model_name": "gpt-4o-mini",
+        "provider": "openai",
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "status_code": 200
+      }
+    ]
+  }
+}
+```
+
 # Specification
 
 - PydanticAI for queries
@@ -148,10 +169,14 @@ TypeSafe response:
   - `n_retries` counts retries of transient provider failures
   - `n_retries_malformed_structure` counts PydanticAI corrective retries for malformed output
   - `latency` is end-to-end request latency in seconds, including retries
+- Debugging
   - `max_error` is the largest probability distribution-sum error
   - `invalid_probs` counts answers whose probability error exceeds `1e-6`
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
+  - `llm_queries` contains the final JSON HTTP request body for each provider attempt
+  - `llm_responses` contains the matching raw JSON HTTP response body, or `null` when no response arrived
+  - `debug_info` contains matching provider, endpoint, status, and error metadata
 - Probability normalization
   - `normalize_probabilities=False` preserves LLM probabilities and only reports errors
   - `normalize_probabilities=True` renormalizes score and choice distributions
@@ -168,7 +193,7 @@ TypeSafe response:
   - `TypeSafeClientAdapter` subclasses `TypeSafeClient`
   - supports synchronous and asynchronous `system_one`, context management, `close`, and `aclose`
   - accepts the same documents and question models and returns the same response models
-- `SystemOneResponse` includes `.model`, `.answers`, and `.usage`; each answer includes `.type`.
+- `SystemOneResponse` includes `.model`, `.answers`, `.usage`, and `.debug`; each answer includes `.type`.
 - Provider SDK exceptions are mapped onto reference-shaped error types: 
   - TypeSafeAuthError (bad key), TypeSafeTimeoutError (timeouts and connection failures) 
   - TypeSafeTokensExceededError (context window exceeded)

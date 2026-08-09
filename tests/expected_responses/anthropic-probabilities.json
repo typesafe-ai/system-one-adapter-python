@@ -1,0 +1,110 @@
+{
+  "model": "claude-haiku-4-5",
+  "answers": {
+    "positive": {
+      "type": "noul",
+      "noul": 0.95
+    },
+    "stars": {
+      "type": "score",
+      "score": 3.1500000000000004,
+      "confidence": 0.675,
+      "probabilities": {
+        "0": 0.01,
+        "1": 0.02,
+        "2": 0.05,
+        "3": 0.65,
+        "4": 0.27
+      }
+    },
+    "genre": {
+      "type": "choice",
+      "choice": "fiction",
+      "confidence": 0.0,
+      "probabilities": {
+        "fiction": 0.5,
+        "nonfiction": 0.5
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 665,
+    "output_tokens": 118,
+    "n_retries": 0,
+    "n_retries_malformed_structure": 0
+  },
+  "debug": {
+    "max_error": 0.0,
+    "invalid_probs": 0,
+    "probability_errors": {},
+    "llm_queries": [
+      {
+        "max_tokens": 4096,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "text": "Document:\n\"This book was a delight to read.\"",
+                "type": "text"
+              }
+            ]
+          }
+        ],
+        "model": "claude-haiku-4-5",
+        "stream": false,
+        "system": [
+          {
+            "type": "text",
+            "text": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1."
+          },
+          {
+            "type": "text",
+            "text": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{\"additionalProperties\": false, \"properties\": {\"answers\": {\"$ref\": \"#/$defs/TypeSafeAnswers\", \"description\": \"Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.\"}}, \"required\": [\"answers\"], \"type\": \"object\", \"$defs\": {\"ChoiceProbabilities2\": {\"additionalProperties\": false, \"properties\": {\"fiction\": {\"description\": \"A novel or short story.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"nonfiction\": {\"description\": \"A book based on facts, real events, or ideas.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}}, \"required\": [\"fiction\", \"nonfiction\"], \"type\": \"object\"}, \"ScoreProbabilities1\": {\"additionalProperties\": false, \"properties\": {\"0\": {\"description\": \"Horrendous. Unreadable garbage.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"1\": {\"description\": \"Pretty bad, but theoretically readable.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"2\": {\"description\": \"Acceptable, but just barely.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"3\": {\"description\": \"Pretty good. Worth reading but not perfect.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"4\": {\"description\": \"Transcendent and impactful. A must read.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}}, \"required\": [\"0\", \"1\", \"2\", \"3\", \"4\"], \"type\": \"object\"}, \"TypeSafeAnswers\": {\"additionalProperties\": false, \"properties\": {\"positive\": {\"description\": \"The book review is positive.\", \"maximum\": 1, \"minimum\": 0, \"type\": \"number\"}, \"stars\": {\"$ref\": \"#/$defs/ScoreProbabilities1\", \"description\": \"Star rating for the book based on the review.\"}, \"genre\": {\"$ref\": \"#/$defs/ChoiceProbabilities2\", \"description\": \"Which genre this review is about.\"}}, \"required\": [\"positive\", \"stars\", \"genre\"], \"type\": \"object\"}}, \"title\": \"TypeSafeEvaluation\"}\n\nDon't include any text or Markdown fencing before or after.\n"
+          }
+        ]
+      }
+    ],
+    "llm_responses": [
+      {
+        "model": "claude-haiku-4-5-20251001",
+        "id": "msg_011CdrHZBc6hfi3PVWktGpcW",
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "```json\n{\n  \"answers\": {\n    \"positive\": 0.95,\n    \"stars\": {\n      \"0\": 0.01,\n      \"1\": 0.02,\n      \"2\": 0.05,\n      \"3\": 0.65,\n      \"4\": 0.27\n    },\n    \"genre\": {\n      \"fiction\": 0.5,\n      \"nonfiction\": 0.5\n    }\n  }\n}\n```"
+          }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 665,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "output_tokens": 118,
+          "service_tier": "standard",
+          "inference_geo": "not_available"
+        }
+      }
+    ],
+    "debug_info": [
+      {
+        "model_name": "claude-haiku-4-5",
+        "model_id": "anthropic:claude-haiku-4-5",
+        "provider": "anthropic",
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "status_code": 200,
+        "response_model_name": "claude-haiku-4-5-20251001",
+        "finish_reason": "stop"
+      }
+    ]
+  }
+}
