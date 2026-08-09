@@ -146,10 +146,13 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     serialized_query = json.dumps(llm_query)
     assert "Evaluate every question" in serialized_query
     assert "A delightful novel." in serialized_query
-    assert llm_query["kind"] == "request"
+    assert llm_query["messages"][-1]["kind"] == "request"
+    model_request_parameters = llm_query["model_request_parameters"]
+    assert model_request_parameters["output_mode"] == expected_output_mode
+    assert "positive" in json.dumps(model_request_parameters["output_object"])
     assert llm_response["kind"] == "response"
     restored_messages = ModelMessagesTypeAdapter.validate_python(
-        [llm_query, llm_response]
+        [*llm_query["messages"], llm_response]
     )
     assert len(restored_messages) == 2
     assert response.debug["debug_info"][0]["model_name"] == "test-model"
@@ -245,10 +248,7 @@ def test_transient_errors_are_retried(async_call):
     assert response.usage.n_retries_malformed_structure == 0
     assert len(response.debug["llm_queries"]) == 2
     assert response.debug["llm_responses"][0] is None
-    assert (
-        response.debug["debug_info"][0]["error_type"]
-        == "ModelHTTPError"
-    )
+    assert response.debug["debug_info"][0]["error_type"] == "ModelHTTPError"
     assert response.debug["llm_responses"][1]["kind"] == "response"
 
 

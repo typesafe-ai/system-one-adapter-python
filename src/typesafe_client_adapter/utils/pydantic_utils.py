@@ -15,6 +15,9 @@ from typesafe_client.api.models import (
 )
 from typesafe_client.values import QuestionCollectionType, question_to_api_model
 
+from typesafe_client_adapter.utils.model_request_debug import (
+    create_model_request_debug_hooks,
+)
 from typesafe_client_adapter.utils.probability_normalization import AnswerMode
 
 Probability: TypeAlias = Annotated[float, Field(ge=0, le=1)]
@@ -100,7 +103,7 @@ def create_pydantic_ai_agent(
     structured_outputs: bool,
     n_retry_malformed_structure: int,
     instructions: str,
-) -> Agent:
+) -> tuple[Agent, dict[str, list[Any]]]:
     """Create the configured PydanticAI agent.
 
     :param model: PydanticAI model or model name.
@@ -108,19 +111,24 @@ def create_pydantic_ai_agent(
     :param structured_outputs: Whether to use native structured output.
     :param n_retry_malformed_structure: Output validation retry count.
     :param instructions: Agent system instructions.
-    :return: Configured agent.
+    :return: Configured agent and its model-request debug capture.
     """
     requested_output: Any = (
         NativeOutput(output_model)
         if structured_outputs
         else PromptedOutput(output_model)
     )
-    return Agent(
+    model_request_debug_hooks, model_request_debug_data = (
+        create_model_request_debug_hooks()
+    )
+    pydantic_agent = Agent(
         _resolve_provider_prefixed_pydantic_ai_model(model),
         output_type=requested_output,
         instructions=instructions,
         retries={"output": n_retry_malformed_structure},
+        capabilities=[model_request_debug_hooks],
     )
+    return pydantic_agent, model_request_debug_data
 
 
 def _create_llm_answer_type_for_question(

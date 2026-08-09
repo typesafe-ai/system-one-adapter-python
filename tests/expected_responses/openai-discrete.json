@@ -39,16 +39,98 @@
     "probability_errors": {},
     "llm_queries": [
       {
-        "parts": [
+        "messages": [
           {
-            "content": "Document:\n\"This book was a delight to read.\"",
-            "part_kind": "user-prompt"
+            "parts": [
+              {
+                "content": "Document:\n\"This book was a delight to read.\"",
+                "part_kind": "user-prompt"
+              }
+            ],
+            "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
+            "kind": "request",
+            "metadata": null,
+            "state": "complete"
           }
         ],
-        "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
-        "kind": "request",
-        "metadata": null,
-        "state": "complete"
+        "model_settings": null,
+        "model_request_parameters": {
+          "function_tools": [],
+          "native_tools": [],
+          "tool_visibility": {},
+          "revealed_tool_names": [],
+          "output_mode": "prompted",
+          "output_object": {
+            "json_schema": {
+              "additionalProperties": false,
+              "properties": {
+                "answers": {
+                  "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TypeSafeAnswers"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "answers"
+              ],
+              "type": "object",
+              "$defs": {
+                "TypeSafeAnswers": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "positive": {
+                      "description": "The book review is positive.",
+                      "type": "boolean"
+                    },
+                    "stars": {
+                      "description": "Star rating for the book based on the review.\nScore levels, answer with the integer:\n0 = Horrendous. Unreadable garbage.\n1 = Pretty bad, but theoretically readable.\n2 = Acceptable, but just barely.\n3 = Pretty good. Worth reading but not perfect.\n4 = Transcendent and impactful. A must read.",
+                      "exclusiveMaximum": 5,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "genre": {
+                      "description": "Which genre this review is about.\nChoice labels, answer with one label:\nfiction = A novel or short story.\nnonfiction = A book based on facts, real events, or ideas.",
+                      "enum": [
+                        "fiction",
+                        "nonfiction"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "positive",
+                    "stars",
+                    "genre"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "name": "TypeSafeEvaluation",
+            "description": null,
+            "strict": true
+          },
+          "output_tools": [],
+          "prompted_output_template": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{schema}\n\nDon't include any text or Markdown fencing before or after.\n",
+          "allow_text_output": true,
+          "allow_image_output": false,
+          "instruction_parts": [
+            {
+              "content": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
+              "dynamic": false,
+              "part_kind": "instruction"
+            },
+            {
+              "content": "\nAlways respond with a JSON object that's compatible with this schema:\n\n{\"additionalProperties\": false, \"properties\": {\"answers\": {\"description\": \"Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key.\", \"anyOf\": [{\"$ref\": \"#/$defs/TypeSafeAnswers\"}]}}, \"required\": [\"answers\"], \"type\": \"object\", \"$defs\": {\"TypeSafeAnswers\": {\"additionalProperties\": false, \"properties\": {\"positive\": {\"description\": \"The book review is positive.\", \"type\": \"boolean\"}, \"stars\": {\"description\": \"Star rating for the book based on the review.\\nScore levels, answer with the integer:\\n0 = Horrendous. Unreadable garbage.\\n1 = Pretty bad, but theoretically readable.\\n2 = Acceptable, but just barely.\\n3 = Pretty good. Worth reading but not perfect.\\n4 = Transcendent and impactful. A must read.\", \"exclusiveMaximum\": 5, \"minimum\": 0, \"type\": \"integer\"}, \"genre\": {\"description\": \"Which genre this review is about.\\nChoice labels, answer with one label:\\nfiction = A novel or short story.\\nnonfiction = A book based on facts, real events, or ideas.\", \"enum\": [\"fiction\", \"nonfiction\"], \"type\": \"string\"}}, \"required\": [\"positive\", \"stars\", \"genre\"], \"type\": \"object\"}}, \"title\": \"TypeSafeEvaluation\"}\n\nDon't include any text or Markdown fencing before or after.\n",
+              "dynamic": false,
+              "part_kind": "instruction"
+            }
+          ],
+          "thinking": null
+        }
       }
     ],
     "llm_responses": [
@@ -73,7 +155,7 @@
           "details": {
             "reasoning_tokens": 0
           },
-          "cost": "0.00006435",
+          "cost": null,
           "output_reasoning_tokens": 0
         },
         "model_name": "gpt-4o-mini-2024-07-18",
@@ -92,9 +174,11 @@
     ],
     "debug_info": [
       {
-        "model_name": "gpt-4o-mini-2024-07-18",
+        "model_name": "gpt-4o-mini",
+        "model_id": "openai:gpt-4o-mini",
+        "provider": "openai",
         "finish_reason": "stop",
-        "provider": "openai"
+        "response_model_name": "gpt-4o-mini-2024-07-18"
       }
     ]
   }

@@ -7,7 +7,7 @@ this client builds and the response it parses are both exercised for real.
 
 Cassettes live in ``tests/cassettes`` and are replayed by default, so the whole client
 stack runs against recorded provider traffic without credentials or network access.
-Complete responses, including serialized PydanticAI messages, live in
+Complete responses, including serialized PydanticAI request contexts, live in
 ``tests/expected_responses``.
 Re-record after changing prompts, schemas, or providers::
 
@@ -49,6 +49,7 @@ QUESTIONS = {
         },
     ),
 }
+
 
 @pytest.mark.vcr
 @pytest.mark.parametrize(
@@ -108,7 +109,10 @@ def test_live_responses_match_reference_shape(
             strict=True,
         ):
             ModelMessagesTypeAdapter.validate_python(
-                [llm_query, *([llm_response] if llm_response is not None else [])]
+                [
+                    *llm_query["messages"],
+                    *([llm_response] if llm_response is not None else []),
+                ]
             )
     assert json.dumps(response_data, sort_keys=True) == json.dumps(
         expected_response_data,

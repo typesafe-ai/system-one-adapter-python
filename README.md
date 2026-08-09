@@ -135,16 +135,28 @@ LLM response:
     "probability_errors": {},
     "llm_queries": [
       {
-        "parts": [
+        "messages": [
           {
-            "content": "Document:\n\"This book was a delight to read.\"",
-            "part_kind": "user-prompt"
+            "parts": [
+              {
+                "content": "Document:\n\"This book was a delight to read.\"",
+                "part_kind": "user-prompt"
+              }
+            ],
+            "instructions": "Evaluate every question using only the supplied document.",
+            "kind": "request",
+            "metadata": null,
+            "state": "complete"
           }
         ],
-        "instructions": "Evaluate every question using only the supplied document.",
-        "kind": "request",
-        "metadata": null,
-        "state": "complete"
+        "model_settings": {},
+        "model_request_parameters": {
+          "function_tools": [],
+          "output_mode": "native",
+          "output_object": {
+            "json_schema": {"type": "object", "properties": {"answers": {}}}
+          }
+        }
       }
     ],
     "llm_responses": [
@@ -191,9 +203,12 @@ LLM response:
   - `invalid_probs` counts answers whose probability error exceeds `1e-6`
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
-  - `llm_queries` contains JSON-serialized PydanticAI `ModelRequest` messages for each model attempt
+  - `llm_queries` contains each PydanticAI logical request: serialized messages, prepared model settings, and prepared `ModelRequestParameters`
+    - request parameters preserve function tools, output tools, output mode, and the structured-output schema needed to reconstruct the call
   - `llm_responses` contains the matching serialized PydanticAI `ModelResponse`, or `null` when no response arrived
-  - request and response entries round-trip through PydanticAI's `ModelMessagesTypeAdapter`
+  - the messages and response round-trip through PydanticAI's `ModelMessagesTypeAdapter`
+  - a public PydanticAI `model_request` hook captures the logical request immediately before the model call
+  - these fields describe the provider-independent PydanticAI request, not the provider's final HTTP body
   - timestamps, run IDs, and conversation IDs are omitted because they are not needed to replay a message and prevent deterministic snapshots
   - `debug_info` contains matching model, provider, finish-reason, and error metadata
 - Probability normalization
