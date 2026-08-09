@@ -169,7 +169,8 @@ class _EvaluationRun:
             answers[question_id] = answer
             probability_normalizations[question_id] = probability_normalization
 
-        assert self._model_request_count_at_agent_run_start is not None
+        if self._model_request_count_at_agent_run_start is None:
+            raise RuntimeError("response() called before any agent run began")
         n_retries_malformed_structure = self._n_retries_malformed_structure + max(
             0,
             self.run_usage.requests - self._model_request_count_at_agent_run_start - 1,
