@@ -53,19 +53,19 @@ QUESTIONS = {
 _DYNAMIC_DEBUG_FIELDS = frozenset({"timestamp", "run_id", "conversation_id"})
 
 
-def _normalize_debug_data(value):
-    """Replace volatile provider-call values while retaining the complete payload."""
+def _normalize_response_data(value):
+    """Replace volatile provider-call values while retaining the complete response."""
     if isinstance(value, dict):
         return {
             key: (
                 "<dynamic>"
                 if key in _DYNAMIC_DEBUG_FIELDS and item is not None
-                else _normalize_debug_data(item)
+                else _normalize_response_data(item)
             )
             for key, item in value.items()
         }
     if isinstance(value, list):
-        return [_normalize_debug_data(item) for item in value]
+        return [_normalize_response_data(item) for item in value]
     return value
 
 
@@ -107,32 +107,13 @@ def test_live_responses_match_reference_shape(
 ):
     response = client.system_one(model, DOCUMENT, QUESTIONS)
     response_data = response.model_dump(mode="json")
-    normalized_response_data = deepcopy(response_data)
+    normalized_response_data = _normalize_response_data(deepcopy(response_data))
 
     # Latency is wall-clock and so never reproducible; assert it is plausible and drop
     # it rather than pinning a recorded value that the next run cannot match.
     latency = normalized_response_data["usage"].pop("latency", None)
     if latency is not None:
         assert 0 < latency < 120
-
-    debug = response_data.get("debug")
-    if isinstance(client, TypeSafeClientAdapter):
-        assert debug["max_error"] == 0
-        assert debug["invalid_probs"] == 0
-        assert debug["probability_errors"] == {}
-        assert len(debug["llm_queries"]) == 1
-        query_entry = debug["llm_queries"][0]
-        serialized_messages = json.dumps(query_entry["llm_query"]["messages"])
-        assert "Evaluate every question" in serialized_messages
-        assert DOCUMENT in serialized_messages
-        assert "json_schema" in query_entry["llm_query"]["model_request_parameters"][
-            "output_object"
-        ]
-        assert query_entry["llm_response"]["kind"] == "response"
-        assert query_entry["debug_info"]["model_name"] == model
-        normalized_response_data["debug"] = _normalize_debug_data(debug)
-    else:
-        assert debug is None
 
     expected_responses_path = Path(__file__).with_name("expected_responses.json")
     expected_response_data = json.loads(expected_responses_path.read_text())[
