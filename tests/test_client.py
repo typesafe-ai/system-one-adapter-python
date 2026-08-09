@@ -20,7 +20,7 @@ from typesafe_client.api.api_client import (
 )
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
-from typesafe_client_adapter import PydanticAIRequest, TypeSafeClientAdapter
+from typesafe_client_adapter import TypeSafeClientAdapter, deserialize_llm_attempt
 from typesafe_client_adapter.utils.error_handling import run_with_retries
 
 QUESTIONS = {
@@ -165,9 +165,15 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert len(restored_messages) == 2
     assert llm_query["debug_info"]["model_name"] == "test-model"
 
-    pydantic_ai_request = PydanticAIRequest.from_llm_attempt(llm_query)
-    replayed_response = asyncio.run(pydantic_ai_request.replay(model))
-    assert pydantic_ai_request.model_id == model.model_id
+    request_context = deserialize_llm_attempt(llm_query, model)
+    replayed_response = asyncio.run(
+        request_context.model.request(
+            request_context.messages,
+            request_context.model_settings,
+            request_context.model_request_parameters,
+        )
+    )
+    assert request_context.model.model_id == model.model_id
     assert replayed_response.parts == restored_messages[-1].parts
 
 

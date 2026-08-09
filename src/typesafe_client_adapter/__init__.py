@@ -11,11 +11,10 @@ from typesafe_client.api.api_client import (
 from typesafe_client.api.retry import NoRetries
 
 from .client import TypeSafeClientAdapter
-from .llm_attempt import PydanticAIRequest
+from .llm_attempt import deserialize_llm_attempt
 
 __all__ = [
     "NoRetries",
-    "PydanticAIRequest",
     "RetryConfig",
     "TypeSafeApiError",
     "TypeSafeAuthError",
@@ -23,4 +22,5 @@ __all__ = [
     "TypeSafeTimeoutError",
     "TypeSafeTokensExceededError",
     "TypeSafeUnknownError",
+    "deserialize_llm_attempt",
 ]
