@@ -40,8 +40,8 @@ from open_typesafe_client.utils.error_handling import (
 from open_typesafe_client.utils.probability_normalization import (
     AnswerMode,
     ProbabilityNormalization,
-    ProbabilityNormalizationStats,
     normalize_probabilities,
+    probability_usage_data,
     to_distribution,
 )
 from open_typesafe_client.utils.pydantic_utils import (
@@ -133,10 +133,15 @@ class _Evaluation:
     should_normalize_probabilities: bool
     run_usage: RunUsage = field(default_factory=RunUsage)
     started_at: float = field(default_factory=time.perf_counter)
-    _requests_before_attempt: int = 0
+    _requests_before_attempt: int | None = None
+    _n_retries_malformed_structure: int = 0
 
     def begin_attempt(self) -> None:
-        """Record the request count so the final attempt's retries can be counted."""
+        """Finish accounting for the prior attempt and start the next one."""
+        if self._requests_before_attempt is not None:
+            self._n_retries_malformed_structure += (
+                self.run_usage.requests - self._requests_before_attempt
+            )
         self._requests_before_attempt = self.run_usage.requests
 
     def response(self, output: BaseModel, n_retries: int) -> SystemOneResponse:
@@ -149,7 +154,10 @@ class _Evaluation:
         latency = time.perf_counter() - self.started_at
         raw_answers = output.model_dump(mode="python", by_alias=True)["answers"]
         answers: dict[str, Answer] = {}
-        probability_normalization_stats = ProbabilityNormalizationStats()
+        probability_normalizations: dict[
+            str,
+            ProbabilityNormalization | None,
+        ] = {}
         for question_id, question in self.questions.items():
             answer, probability_normalization = _answer(
                 question,
@@ -158,12 +166,12 @@ class _Evaluation:
                 self.should_normalize_probabilities,
             )
             answers[question_id] = answer
-            probability_normalization_stats.add(question_id, probability_normalization)
+            probability_normalizations[question_id] = probability_normalization
 
-        # Only the final attempt's extra requests are corrective output retries;
-        # earlier attempts were separate agent runs counted by ``n_retries``.
-        n_retries_malformed_structure = max(
-            0, self.run_usage.requests - self._requests_before_attempt - 1
+        assert self._requests_before_attempt is not None
+        n_retries_malformed_structure = self._n_retries_malformed_structure + max(
+            0,
+            self.run_usage.requests - self._requests_before_attempt - 1,
         )
         usage_data: dict[str, Any] = {
             "input_tokens": self.run_usage.input_tokens,
@@ -172,7 +180,7 @@ class _Evaluation:
             "n_retries_malformed_structure": n_retries_malformed_structure,
             "latency": latency,
         }
-        usage_data.update(probability_normalization_stats.usage_data())
+        usage_data.update(probability_usage_data(probability_normalizations))
         return SystemOneResponse(
             model=self.model_name,
             answers=answers,

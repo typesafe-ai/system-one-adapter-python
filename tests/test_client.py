@@ -57,12 +57,15 @@ def test_confidence_metrics(confidence_metric, probabilities, expected_confidenc
     assert confidence_metric(probabilities) == pytest.approx(expected_confidence)
 
 
-def model_response(response_data, expected_output_mode):
+def model_response(response_data, expected_output_mode, expected_descriptions=()):
     """Return a local model producing ``response_data`` in the requested output mode."""
 
     def respond(messages, agent_info):
         parameters = agent_info.model_request_parameters
         assert parameters.output_mode == expected_output_mode
+        output_schema = parameters.output_object.json_schema
+        for expected_description in expected_descriptions:
+            assert expected_description in json.dumps(output_schema)
         if not agent_info.output_tools:
             parts = [TextPart(json.dumps(response_data))]
         else:
@@ -106,7 +109,20 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
         llm_answer_mode=answer_mode,
     )
     expected_output_mode = "native" if structured_outputs else "prompted"
-    model = model_response(response_data, expected_output_mode)
+    expected_descriptions = (
+        (
+            "Score levels, answer with the integer:\\n0 = Bad.\\n1 = Good.",
+            "Choice labels, answer with one label:\\nfiction = A story.\\n"
+            "nonfiction = Facts.",
+        )
+        if answer_mode == "discrete"
+        else ()
+    )
+    model = model_response(
+        response_data,
+        expected_output_mode,
+        expected_descriptions,
+    )
 
     if async_call:
         response = asyncio.run(
@@ -144,60 +160,67 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
 
 
 @pytest.mark.parametrize(
-    ("normalize_probabilities", "expected_answers", "expected_originals"),
+    (
+        "normalize_probabilities",
+        "raw_probability",
+        "expected_probability",
+        "expected_originals",
+        "expected_max_error",
+        "expected_probability_errors",
+    ),
     [
         (
             False,
-            {
-                "positive": 0.8,
-                "stars": {"0": 0.2, "1": 0.2},
-                "genre": {"fiction": 0.8, "nonfiction": 0.8},
-            },
+            0.2,
+            0.2,
             None,
+            0.6,
+            {"stars": 0.6, "genre": 0.6},
         ),
         (
             True,
-            {
-                "positive": 0.8,
-                "stars": {"0": 0.5, "1": 0.5},
-                "genre": {"fiction": 0.5, "nonfiction": 0.5},
-            },
+            0.2,
+            0.5,
             {
                 "stars": {"0": 0.2, "1": 0.2},
-                "genre": {"fiction": 0.8, "nonfiction": 0.8},
+                "genre": {"fiction": 0.2, "nonfiction": 0.2},
             },
+            0.6,
+            {"stars": 0.6, "genre": 0.6},
         ),
+        (False, 0.50000025, 0.50000025, None, 5e-7, {}),
     ],
 )
 def test_probability_validation(
     normalize_probabilities,
-    expected_answers,
+    raw_probability,
+    expected_probability,
     expected_originals,
+    expected_max_error,
+    expected_probability_errors,
 ):
     response_data = {
         "answers": {
             "positive": 0.8,
-            "stars": {"0": 0.2, "1": 0.2},
-            "genre": {"fiction": 0.8, "nonfiction": 0.8},
+            "stars": {"0": raw_probability, "1": raw_probability},
+            "genre": {"fiction": raw_probability, "nonfiction": raw_probability},
         }
     }
     response = OpenTypeSafeClient(
         normalize_probabilities=normalize_probabilities
     ).system_one(model_response(response_data, "prompted"), "document", QUESTIONS)
 
-    assert response.answers["positive"].noul == pytest.approx(
-        expected_answers["positive"]
-    )
+    assert response.answers["positive"].noul == pytest.approx(0.8)
     assert response.answers["stars"].probabilities == pytest.approx(
-        expected_answers["stars"]
+        {"0": expected_probability, "1": expected_probability}
     )
     assert response.answers["genre"].probabilities == pytest.approx(
-        expected_answers["genre"]
+        {"fiction": expected_probability, "nonfiction": expected_probability}
     )
-    assert response.usage.max_error == pytest.approx(0.6)
-    assert response.usage.invalid_probs == 2
+    assert response.usage.max_error == pytest.approx(expected_max_error)
+    assert response.usage.invalid_probs == len(expected_probability_errors)
     assert response.usage.probability_errors == pytest.approx(
-        {"stars": 0.6, "genre": 0.6}
+        expected_probability_errors
     )
     assert getattr(response.usage, "original_probabilities", None) == expected_originals
 
@@ -352,7 +375,7 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
     assert response.usage.input_tokens == 200
     assert response.usage.output_tokens == 100
     assert response.usage.n_retries == 1
-    assert response.usage.n_retries_malformed_structure == 0
+    assert response.usage.n_retries_malformed_structure == 1
 
 
 @pytest.mark.parametrize(

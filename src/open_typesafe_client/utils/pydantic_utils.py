@@ -173,17 +173,20 @@ def _build_question_description(
     llm_answer_mode: AnswerMode,
 ) -> str:
     description = _serialize_instructions(question.instructions)
-    if isinstance(question, ScoreQuestion) and llm_answer_mode == "discrete":
-        # Discrete mode carries the criteria nowhere else, so a model given only the
-        # instructions guesses its own scale (such as 1-5 stars for a 0-4 score). In
-        # probabilities mode the criteria are already the per-label descriptions, and
-        # naming an integer answer here makes models return a score instead of a
-        # distribution.
-        levels = "\n".join(
-            f"{score} = {_serialize_instructions(criterion)}"
-            for score, criterion in enumerate(question.criteria)
-        )
-        return f"{description}\nScore levels, answer with the integer:\n{levels}"
+    if llm_answer_mode == "discrete":
+        if isinstance(question, ScoreQuestion):
+            levels = "\n".join(
+                f"{score} = {_serialize_instructions(criterion)}"
+                for score, criterion in enumerate(question.criteria)
+            )
+            return f"{description}\nScore levels, answer with the integer:\n{levels}"
+
+        if isinstance(question, ChoiceQuestion):
+            choices = "\n".join(
+                f"{label} = {_serialize_instructions(criterion)}"
+                for label, criterion in question.criteria.items()
+            )
+            return f"{description}\nChoice labels, answer with one label:\n{choices}"
 
     if not isinstance(question, NoulQuestion) or question.criteria is None:
         return description
