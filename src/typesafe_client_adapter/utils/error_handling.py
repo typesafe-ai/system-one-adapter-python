@@ -1,8 +1,9 @@
 """Provider error mapping and retry handling."""
 
-from collections.abc import Awaitable, Callable, Iterator
-from contextlib import contextmanager
-from typing import TypeVar, cast
+import asyncio
+import time
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
 import httpx
 from pydantic_ai import ModelAPIError, ModelHTTPError
@@ -14,25 +15,8 @@ from typesafe_client.api.api_client import (
     TypeSafeTokensExceededError,
     TypeSafeUnknownError,
 )
-from typesafe_client.api.retry import RetryLoop, TypeSafeMaxRetriesExceededError
-
-_TOKEN_ERROR_MARKERS = (
-    "context_length_exceeded",
-    "context window",
-    "maximum context",
-    "prompt is too long",
-    "request too large",
-    "too many tokens",
-)
 
 ResultT = TypeVar("ResultT")
-
-
-class _RetryableTypeSafeTimeoutError(TypeSafeTimeoutError):
-    """Adapter timeout error compatible with the reference retry loop."""
-
-    def is_retryable(self) -> bool:
-        return True
 
 
 def run_with_retries(
@@ -45,19 +29,20 @@ def run_with_retries(
     :param retry: Transient-failure retry policy.
     :return: Result and retry count.
     """
-    retry_loop = RetryLoop(retry)
+    for attempt in range(1, retry.max_attempts + 1):
+        try:
+            return function(), attempt - 1
+        except Exception as error:
+            mapped_error = _map_provider_exception_to_typesafe_api_error(error)
+            retryable = isinstance(mapped_error, TypeSafeTimeoutError) or (
+                mapped_error.is_retryable()
+            )
+            if attempt == retry.max_attempts or not retryable:
+                raise mapped_error from error
+            if delay := retry.next_delay(attempt=attempt):
+                time.sleep(delay)
 
-    def call_with_mapped_provider_errors() -> ResultT:
-        with _map_provider_errors():
-            return function()
-
-    try:
-        result = retry_loop.retry(call_with_mapped_provider_errors)
-    except TypeSafeMaxRetriesExceededError as retry_error:
-        mapped_error = retry_error.__cause__
-        assert isinstance(mapped_error, TypeSafeApiError)
-        raise mapped_error from mapped_error.__cause__
-    return cast(ResultT, result), retry_loop.attempt - 1
+    raise AssertionError("retry loop did not return or raise")
 
 
 async def run_with_retries_async(
@@ -70,31 +55,20 @@ async def run_with_retries_async(
     :param retry: Transient-failure retry policy.
     :return: Result and retry count.
     """
-    retry_loop = RetryLoop(retry)
+    for attempt in range(1, retry.max_attempts + 1):
+        try:
+            return await function(), attempt - 1
+        except Exception as error:
+            mapped_error = _map_provider_exception_to_typesafe_api_error(error)
+            retryable = isinstance(mapped_error, TypeSafeTimeoutError) or (
+                mapped_error.is_retryable()
+            )
+            if attempt == retry.max_attempts or not retryable:
+                raise mapped_error from error
+            if delay := retry.next_delay(attempt=attempt):
+                await asyncio.sleep(delay)
 
-    async def call_with_mapped_provider_errors() -> ResultT:
-        with _map_provider_errors():
-            return await function()
-
-    try:
-        result = await retry_loop.async_retry(call_with_mapped_provider_errors)
-    except TypeSafeMaxRetriesExceededError as retry_error:
-        mapped_error = retry_error.__cause__
-        assert isinstance(mapped_error, TypeSafeApiError)
-        raise mapped_error from mapped_error.__cause__
-    return cast(ResultT, result), retry_loop.attempt - 1
-
-
-@contextmanager
-def _map_provider_errors() -> Iterator[None]:
-    """Map errors raised inside one PydanticAI provider attempt."""
-    try:
-        yield
-    except TypeSafeApiError:
-        raise
-    except Exception as error:
-        raise _map_provider_exception_to_typesafe_api_error(error) from error
-
+    raise AssertionError("retry loop did not return or raise")
 
 def _map_provider_exception_to_typesafe_api_error(
     error: Exception,
@@ -110,9 +84,16 @@ def _map_provider_exception_to_typesafe_api_error(
         isinstance(error, ModelAPIError) and not isinstance(error, ModelHTTPError)
     )
     if is_connection_error or status_code in (408, 504):
-        return _RetryableTypeSafeTimeoutError(detail)
+        return TypeSafeTimeoutError(detail)
 
-    error_text = str(error).lower()
-    if any(marker in error_text for marker in _TOKEN_ERROR_MARKERS):
+    body = error.body if isinstance(error, ModelHTTPError) else None
+    provider_error = body.get("error", body) if isinstance(body, dict) else {}
+    context_window_exceeded = isinstance(provider_error, dict) and (
+        provider_error.get("code") == "context_length_exceeded"
+        or str(provider_error.get("message", "")).lower().startswith(
+            "prompt is too long"
+        )
+    )
+    if status_code == 400 and context_window_exceeded:
         return TypeSafeTokensExceededError(detail)
     return TypeSafeUnknownError(detail, status_code)
