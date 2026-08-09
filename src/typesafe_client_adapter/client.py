@@ -44,13 +44,12 @@ from typesafe_client_adapter.utils.probability_normalization import (
     probability_debug_data,
     to_distribution,
 )
-from typesafe_client_adapter.utils.provider_debug import ProviderDebugModel
+from typesafe_client_adapter.utils.provider_debug import _DebugCapturingModel
 from typesafe_client_adapter.utils.pydantic_utils import (
     Question,
+    convert_and_validate_questions,
     create_llm_output_model,
     create_pydantic_ai_agent,
-    get_model_name,
-    prepare_questions,
 )
 
 Answer = NoulAnswer | ScoreAnswer | ChoiceAnswer
@@ -119,7 +118,7 @@ def _convert_llm_value_to_typesafe_answer(
 
 
 @dataclass
-class _Evaluation:
+class _EvaluationRun:
     """State shared by the synchronous and asynchronous ``system_one`` paths.
 
     ``run_usage`` is threaded through every PydanticAI attempt so that tokens spent on
@@ -129,21 +128,22 @@ class _Evaluation:
     model_name: str
     questions: dict[str, Question]
     pydantic_agent: Agent
-    provider_debug_model: ProviderDebugModel
+    provider_debug_model: _DebugCapturingModel
     llm_answer_mode: AnswerMode
     should_normalize_probabilities: bool
     run_usage: RunUsage = field(default_factory=RunUsage)
     started_at: float = field(default_factory=time.perf_counter)
-    _requests_before_attempt: int | None = None
+    _model_request_count_at_agent_run_start: int | None = None
     _n_retries_malformed_structure: int = 0
 
-    def begin_attempt(self) -> None:
-        """Finish accounting for the prior attempt and start the next one."""
-        if self._requests_before_attempt is not None:
+    def begin_agent_run(self) -> None:
+        """Finish retry accounting for the prior agent run and start the next one."""
+        if self._model_request_count_at_agent_run_start is not None:
             self._n_retries_malformed_structure += (
-                self.run_usage.requests - self._requests_before_attempt
+                self.run_usage.requests
+                - self._model_request_count_at_agent_run_start
             )
-        self._requests_before_attempt = self.run_usage.requests
+        self._model_request_count_at_agent_run_start = self.run_usage.requests
 
     def response(self, output: BaseModel, n_retries: int) -> SystemOneResponse:
         """Build the response from a successful attempt.
@@ -169,22 +169,23 @@ class _Evaluation:
             answers[question_id] = answer
             probability_normalizations[question_id] = probability_normalization
 
-        assert self._requests_before_attempt is not None
+        assert self._model_request_count_at_agent_run_start is not None
         n_retries_malformed_structure = self._n_retries_malformed_structure + max(
             0,
-            self.run_usage.requests - self._requests_before_attempt - 1,
+            self.run_usage.requests
+            - self._model_request_count_at_agent_run_start
+            - 1,
         )
-        usage_data: dict[str, Any] = {
-            "input_tokens": self.run_usage.input_tokens,
-            "output_tokens": self.run_usage.output_tokens,
-            "n_retries": n_retries,
-            "n_retries_malformed_structure": n_retries_malformed_structure,
-            "latency": latency,
-        }
         return SystemOneResponse(
             model=self.model_name,
             answers=answers,
-            usage=Usage(**usage_data),
+            usage=Usage(
+                input_tokens=self.run_usage.input_tokens,
+                output_tokens=self.run_usage.output_tokens,
+                n_retries=n_retries,
+                n_retries_malformed_structure=n_retries_malformed_structure,
+                latency=latency,
+            ),
             debug={
                 **probability_debug_data(probability_normalizations),
                 "llm_queries": self.provider_debug_model.llm_queries,
@@ -231,9 +232,9 @@ class TypeSafeClientAdapter(TypeSafeClient):
         self,
         model: str | Model,
         questions: QuestionCollectionType,
-    ) -> _Evaluation:
+    ) -> _EvaluationRun:
         """Prepare the questions, output model, and agent for one evaluation."""
-        prepared_questions = prepare_questions(questions)
+        prepared_questions = convert_and_validate_questions(questions)
         output_model = create_llm_output_model(
             prepared_questions,
             self.llm_answer_mode,
@@ -245,8 +246,8 @@ class TypeSafeClientAdapter(TypeSafeClient):
             self.n_retry_malformed_structure,
             _SYSTEM_PROMPT,
         )
-        return _Evaluation(
-            model_name=get_model_name(model),
+        return _EvaluationRun(
+            model_name=model if isinstance(model, str) else model.model_name,
             questions=prepared_questions,
             pydantic_agent=pydantic_agent,
             provider_debug_model=provider_debug_model,
@@ -264,7 +265,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         evaluation = self._evaluation(model, questions)
 
         def run_pydantic_agent_attempt() -> Any:
-            evaluation.begin_attempt()
+            evaluation.begin_agent_run()
             return evaluation.pydantic_agent.run_sync(
                 _serialize_document_as_user_prompt(document),
                 usage=evaluation.run_usage,
@@ -289,7 +290,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         evaluation = self._evaluation(model, questions)
 
         def run_pydantic_agent_attempt_async() -> Any:
-            evaluation.begin_attempt()
+            evaluation.begin_agent_run()
             return evaluation.pydantic_agent.run(
                 _serialize_document_as_user_prompt(document),
                 usage=evaluation.run_usage,

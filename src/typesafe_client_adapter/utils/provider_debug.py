@@ -14,8 +14,12 @@ from pydantic_ai.settings import ModelSettings
 from pydantic_core import to_jsonable_python
 
 
-class ProviderDebugModel(WrapperModel):
+class _DebugCapturingModel(WrapperModel):
     """Model wrapper recording every provider request and response.
+
+    The wrapper keeps capture aligned with every PydanticAI attempt and retry. It
+    records final HTTP bodies when available, falls back to PydanticAI request data
+    for non-HTTP models, and captures errors without duplicating sync and async paths.
 
     :param wrapped: PydanticAI model or known model name.
     """

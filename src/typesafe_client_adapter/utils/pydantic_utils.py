@@ -7,17 +7,23 @@ from typing import Annotated, Any, Literal, TypeAlias
 from pydantic import BaseModel, ConfigDict, Field, create_model
 from pydantic_ai import Agent, NativeOutput, PromptedOutput
 from pydantic_ai.models import Model
-from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
+from typesafe_client.api.models import (
+    ChoiceQuestion,
+    NoulQuestion,
+    Question,
+    ScoreQuestion,
+)
 from typesafe_client.values import QuestionCollectionType, question_to_api_model
 
 from typesafe_client_adapter.utils.probability_normalization import AnswerMode
-from typesafe_client_adapter.utils.provider_debug import ProviderDebugModel
+from typesafe_client_adapter.utils.provider_debug import _DebugCapturingModel
 
 Probability: TypeAlias = Annotated[float, Field(ge=0, le=1)]
-Question: TypeAlias = NoulQuestion | ScoreQuestion | ChoiceQuestion
 
 
-def prepare_questions(questions: QuestionCollectionType) -> dict[str, Question]:
+def convert_and_validate_questions(
+    questions: QuestionCollectionType,
+) -> dict[str, Question]:
     """Convert and validate TypeSafe questions.
 
     :param questions: TypeSafe question collection.
@@ -25,17 +31,17 @@ def prepare_questions(questions: QuestionCollectionType) -> dict[str, Question]:
     """
     if not questions:
         raise ValueError("At least one question is required.")
-    prepared_questions = {
-        key: question_to_api_model(question) for key, question in questions.items()
-    }
-    for question in prepared_questions.values():
+    prepared_questions = {}
+    for key, question in questions.items():
+        prepared_question = question_to_api_model(question)
         if (
-            isinstance(question, (ScoreQuestion, ChoiceQuestion))
-            and not question.criteria
+            isinstance(prepared_question, (ScoreQuestion, ChoiceQuestion))
+            and not prepared_question.criteria
         ):
             raise ValueError(
                 "Score and choice questions require at least one criterion."
             )
+        prepared_questions[key] = prepared_question
     return prepared_questions
 
 
@@ -95,7 +101,7 @@ def create_pydantic_ai_agent(
     structured_outputs: bool,
     n_retry_malformed_structure: int,
     instructions: str,
-) -> tuple[Agent, ProviderDebugModel]:
+) -> tuple[Agent, _DebugCapturingModel]:
     """Create the configured PydanticAI agent.
 
     :param model: PydanticAI model or model name.
@@ -110,7 +116,7 @@ def create_pydantic_ai_agent(
         if structured_outputs
         else PromptedOutput(output_model)
     )
-    provider_debug_model = ProviderDebugModel(
+    provider_debug_model = _DebugCapturingModel(
         _resolve_provider_prefixed_pydantic_ai_model(model)
     )
     pydantic_agent = Agent(
@@ -120,11 +126,6 @@ def create_pydantic_ai_agent(
         retries={"output": n_retry_malformed_structure},
     )
     return pydantic_agent, provider_debug_model
-
-
-def get_model_name(model: str | Model) -> str:
-    """Return a string model name."""
-    return model if isinstance(model, str) else model.model_name
 
 
 def _create_llm_answer_type_for_question(
