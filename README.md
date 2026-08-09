@@ -1,3 +1,5 @@
+# TypeSafeClientAdapter
+
 TypeSafeClientAdapter is a library that is a drop-in replacement for the TypeSafeClient and API, but using LLM APIs.
 
 It's main uses cases are
