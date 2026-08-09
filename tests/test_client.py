@@ -5,6 +5,7 @@ import json
 
 import httpx
 import pytest
+from pydantic_ai import ModelMessagesTypeAdapter
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
@@ -141,13 +142,16 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
     assert response.debug["probability_errors"] == {}
 
     llm_query = response.debug["llm_queries"][0]
-    serialized_messages = json.dumps(llm_query["messages"])
-    assert "Evaluate every question" in serialized_messages
-    assert "A delightful novel." in serialized_messages
-    request_parameters = llm_query["model_request_parameters"]
-    assert request_parameters["output_mode"] == expected_output_mode
-    assert "positive" in json.dumps(request_parameters["output_object"])
-    assert response.debug["llm_responses"][0]["kind"] == "response"
+    llm_response = response.debug["llm_responses"][0]
+    serialized_query = json.dumps(llm_query)
+    assert "Evaluate every question" in serialized_query
+    assert "A delightful novel." in serialized_query
+    assert llm_query["kind"] == "request"
+    assert llm_response["kind"] == "response"
+    restored_messages = ModelMessagesTypeAdapter.validate_python(
+        [llm_query, llm_response]
+    )
+    assert len(restored_messages) == 2
     assert response.debug["debug_info"][0]["model_name"] == "test-model"
 
 

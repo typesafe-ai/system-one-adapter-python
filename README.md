@@ -135,21 +135,38 @@ LLM response:
     "probability_errors": {},
     "llm_queries": [
       {
-        "model": "gpt-4o-mini",
-        "input": ["Final provider HTTP request messages"],
-        "text": {"format": {"type": "json_object"}}
+        "parts": [
+          {
+            "content": "Document:\n\"This book was a delight to read.\"",
+            "part_kind": "user-prompt"
+          }
+        ],
+        "instructions": "Evaluate every question using only the supplied document.",
+        "kind": "request",
+        "metadata": null,
+        "state": "complete"
       }
     ],
     "llm_responses": [
-      {"id": "response-id", "output": []}
+      {
+        "parts": [
+          {
+            "content": "{\"answers\": {...}}",
+            "part_kind": "text"
+          }
+        ],
+        "model_name": "gpt-4o-mini-2024-07-18",
+        "kind": "response",
+        "provider_name": "openai",
+        "finish_reason": "stop",
+        "state": "complete"
+      }
     ],
     "debug_info": [
       {
-        "model_name": "gpt-4o-mini",
+        "model_name": "gpt-4o-mini-2024-07-18",
         "provider": "openai",
-        "method": "POST",
-        "url": "https://api.openai.com/v1/responses",
-        "status_code": 200
+        "finish_reason": "stop"
       }
     ]
   }
@@ -174,9 +191,11 @@ LLM response:
   - `invalid_probs` counts answers whose probability error exceeds `1e-6`
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
-  - `llm_queries` contains the final JSON HTTP request body for each provider attempt
-  - `llm_responses` contains the matching raw JSON HTTP response body, or `null` when no response arrived
-  - `debug_info` contains matching provider, endpoint, status, and error metadata
+  - `llm_queries` contains JSON-serialized PydanticAI `ModelRequest` messages for each model attempt
+  - `llm_responses` contains the matching serialized PydanticAI `ModelResponse`, or `null` when no response arrived
+  - request and response entries round-trip through PydanticAI's `ModelMessagesTypeAdapter`
+  - timestamps, run IDs, and conversation IDs are omitted because they are not needed to replay a message and prevent deterministic snapshots
+  - `debug_info` contains matching model, provider, finish-reason, and error metadata
 - Probability normalization
   - `normalize_probabilities=False` preserves LLM probabilities and only reports errors
   - `normalize_probabilities=True` renormalizes score and choice distributions

@@ -9,7 +9,8 @@ from types import TracebackType
 from typing import Any, Self, cast
 
 from pydantic import BaseModel
-from pydantic_ai import Agent
+from pydantic_ai import Agent, ModelMessagesTypeAdapter, capture_run_messages
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage
 from typesafe_client import RetryConfig, TypeSafeClient
@@ -44,7 +45,6 @@ from typesafe_client_adapter.utils.probability_normalization import (
     probability_debug_data,
     to_distribution,
 )
-from typesafe_client_adapter.utils.provider_debug import _DebugCapturingModel
 from typesafe_client_adapter.utils.pydantic_utils import (
     Question,
     convert_and_validate_questions,
@@ -128,10 +128,12 @@ class _EvaluationRun:
     model_name: str
     questions: dict[str, Question]
     pydantic_agent: Agent
-    provider_debug_model: _DebugCapturingModel
     llm_answer_mode: AnswerMode
     should_normalize_probabilities: bool
     run_usage: RunUsage = field(default_factory=RunUsage)
+    llm_queries: list[dict[str, Any]] = field(default_factory=list)
+    llm_responses: list[dict[str, Any] | None] = field(default_factory=list)
+    debug_info: list[dict[str, Any]] = field(default_factory=list)
     started_at: float = field(default_factory=time.perf_counter)
     _model_request_count_at_agent_run_start: int | None = None
     _n_retries_malformed_structure: int = 0
@@ -144,6 +146,62 @@ class _EvaluationRun:
                 - self._model_request_count_at_agent_run_start
             )
         self._model_request_count_at_agent_run_start = self.run_usage.requests
+
+    def record_pydantic_ai_message_history(
+        self,
+        model_messages: list[ModelMessage],
+        error: Exception | None = None,
+    ) -> None:
+        """Serialize requests and responses from one PydanticAI agent run.
+
+        :param model_messages: Captured PydanticAI message history.
+        :param error: Exception which ended the run, when applicable.
+        """
+        serialized_messages = ModelMessagesTypeAdapter.dump_python(
+            model_messages,
+            mode="json",
+            exclude={
+                "__all__": {
+                    "conversation_id": True,
+                    "parts": {"__all__": {"timestamp"}},
+                    "run_id": True,
+                    "timestamp": True,
+                }
+            },
+        )
+        request_index: int | None = None
+        for model_message, serialized_message in zip(
+            model_messages,
+            serialized_messages,
+            strict=True,
+        ):
+            if isinstance(model_message, ModelRequest):
+                request_index = len(self.llm_queries)
+                self.llm_queries.append(serialized_message)
+                self.llm_responses.append(None)
+                self.debug_info.append({"model_name": self.model_name})
+                continue
+
+            assert isinstance(model_message, ModelResponse)
+            if request_index is None:
+                continue
+            self.llm_responses[request_index] = serialized_message
+            self.debug_info[request_index].update(
+                {
+                    "finish_reason": model_message.finish_reason,
+                    "model_name": model_message.model_name or self.model_name,
+                    "provider": model_message.provider_name,
+                }
+            )
+            request_index = None
+
+        if error is not None and request_index is not None:
+            self.debug_info[request_index].update(
+                {
+                    "error": str(error),
+                    "error_type": type(error).__name__,
+                }
+            )
 
     def response(self, output: BaseModel, n_retries: int) -> SystemOneResponse:
         """Build the response from a successful attempt.
@@ -188,9 +246,9 @@ class _EvaluationRun:
             ),
             debug={
                 **probability_debug_data(probability_normalizations),
-                "llm_queries": self.provider_debug_model.llm_queries,
-                "llm_responses": self.provider_debug_model.llm_responses,
-                "debug_info": self.provider_debug_model.debug_info,
+                "llm_queries": self.llm_queries,
+                "llm_responses": self.llm_responses,
+                "debug_info": self.debug_info,
             },
         )
 
@@ -239,7 +297,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
             prepared_questions,
             self.llm_answer_mode,
         )
-        pydantic_agent, provider_debug_model = create_pydantic_ai_agent(
+        pydantic_agent = create_pydantic_ai_agent(
             model,
             output_model,
             self.structured_outputs,
@@ -250,7 +308,6 @@ class TypeSafeClientAdapter(TypeSafeClient):
             model_name=model if isinstance(model, str) else model.model_name,
             questions=prepared_questions,
             pydantic_agent=pydantic_agent,
-            provider_debug_model=provider_debug_model,
             llm_answer_mode=self.llm_answer_mode,
             should_normalize_probabilities=self.normalize_probabilities,
         )
@@ -266,19 +323,26 @@ class TypeSafeClientAdapter(TypeSafeClient):
 
         def run_pydantic_agent_attempt() -> Any:
             evaluation.begin_agent_run()
-            return evaluation.pydantic_agent.run_sync(
-                _serialize_document_as_user_prompt(document),
-                usage=evaluation.run_usage,
-            )
+            with capture_run_messages() as model_messages:
+                try:
+                    result = evaluation.pydantic_agent.run_sync(
+                        _serialize_document_as_user_prompt(document),
+                        usage=evaluation.run_usage,
+                    )
+                except Exception as error:
+                    evaluation.record_pydantic_ai_message_history(
+                        model_messages,
+                        error,
+                    )
+                    raise
+            evaluation.record_pydantic_ai_message_history(result.all_messages())
+            return result
 
-        try:
-            result, n_retries = run_with_retries(
-                run_pydantic_agent_attempt,
-                self.retry,
-            )
-            return evaluation.response(cast(BaseModel, result.output), n_retries)
-        finally:
-            evaluation.provider_debug_model.remove_http_hooks()
+        result, n_retries = run_with_retries(
+            run_pydantic_agent_attempt,
+            self.retry,
+        )
+        return evaluation.response(cast(BaseModel, result.output), n_retries)
 
     async def system_one_async(
         self,
@@ -289,21 +353,28 @@ class TypeSafeClientAdapter(TypeSafeClient):
         """Asynchronously evaluate ``questions`` against one ``document``."""
         evaluation = self._evaluation(model, questions)
 
-        def run_pydantic_agent_attempt_async() -> Any:
+        async def run_pydantic_agent_attempt_async() -> Any:
             evaluation.begin_agent_run()
-            return evaluation.pydantic_agent.run(
-                _serialize_document_as_user_prompt(document),
-                usage=evaluation.run_usage,
-            )
+            with capture_run_messages() as model_messages:
+                try:
+                    result = await evaluation.pydantic_agent.run(
+                        _serialize_document_as_user_prompt(document),
+                        usage=evaluation.run_usage,
+                    )
+                except Exception as error:
+                    evaluation.record_pydantic_ai_message_history(
+                        model_messages,
+                        error,
+                    )
+                    raise
+            evaluation.record_pydantic_ai_message_history(result.all_messages())
+            return result
 
-        try:
-            result, n_retries = await run_with_retries_async(
-                run_pydantic_agent_attempt_async,
-                self.retry,
-            )
-            return evaluation.response(cast(BaseModel, result.output), n_retries)
-        finally:
-            evaluation.provider_debug_model.remove_http_hooks()
+        result, n_retries = await run_with_retries_async(
+            run_pydantic_agent_attempt_async,
+            self.retry,
+        )
+        return evaluation.response(cast(BaseModel, result.output), n_retries)
 
     def close(self) -> None:
         """Close the client.
