@@ -159,8 +159,11 @@ TypeSafe response:
   - `retry` configures retries for transient connection, timeout, and retryable HTTP failures
   - `n_retry_malformed_structure` configures corrective retries for output that fails structural validation
   - authentication, context-window, and malformed-structure errors are not retried by `retry`
-- Tests make real LLM and TypeSafe API calls, but also caches the calls to make testing deterministic (see json_cache.py)
-  - the json_cache.json files should live in the test directory next to the tests
+- Tests make real LLM and TypeSafe API calls, recorded as HTTP cassettes so replay is deterministic (vcrpy via pytest-recording)
+  - cassettes are JSON and live in `tests/cassettes`, next to the tests
+  - replay is the default and needs no credentials or network; the whole client stack runs against recorded provider traffic
+  - re-record with `uv run pytest tests/test_live_apis.py --record-mode=rewrite`, which makes real billable calls and needs `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `TYPESAFE_API_KEY`
+  - request/response credentials are stripped at record time (see `tests/conftest.py`); matching includes the request body because every call posts to the same endpoint
 - Compatibility scope
   - `OpenTypeSafeClient` subclasses `TypeSafeClient`
   - supports synchronous and asynchronous `system_one`, context management, `close`, and `aclose`
