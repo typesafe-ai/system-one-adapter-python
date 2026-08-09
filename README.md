@@ -25,7 +25,7 @@ typesafe_client_adapter = TypeSafeClientAdapter(
 )
 typesafe_client = TypeSafeClient()
 
-document = "This book has been a delight to read! Looking forward to the next one!"
+document = "This book was a delight to read."
 
 questions = {
     "positive": NoulQuestion(instructions="The book review is positive."),
@@ -95,7 +95,7 @@ TypeSafe response:
 }
 ```
 
-LLM response:
+TypeSafeClientAdapter response:
 
 ```json
 {
@@ -103,33 +103,33 @@ LLM response:
   "answers": {
     "positive": {
       "type": "noul",
-      "noul": 0.96
+      "noul": 1.0
     },
     "stars": {
       "type": "score",
-      "score": 3.46,
-      "confidence": 0.55,
+      "score": 4.0,
+      "confidence": 1.0,
       "probabilities": {
-        "0": 0.01,
-        "1": 0.02,
-        "2": 0.07,
-        "3": 0.3,
-        "4": 0.6
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 1.0
       }
     },
     "genre": {
       "type": "choice",
       "choice": "fiction",
-      "confidence": 0.64,
+      "confidence": 1.0,
       "probabilities": {
-        "fiction": 0.82,
-        "nonfiction": 0.18
+        "fiction": 1.0,
+        "nonfiction": 0.0
       }
     }
   },
   "usage": {
-    "input_tokens": 356,
-    "output_tokens": 91,
+    "input_tokens": 621,
+    "output_tokens": 42,
     "n_retries": 0,
     "n_retries_malformed_structure": 0,
     "latency": 0.74
@@ -145,38 +145,196 @@ LLM response:
             "parts": [
               {
                 "content": "Document:\n\"This book was a delight to read.\"",
+                "timestamp": "2026-08-09T04:21:24.031483Z",
                 "part_kind": "user-prompt"
               }
             ],
-            "instructions": "Evaluate every question using only the supplied document.",
+            "timestamp": "2026-08-09T04:21:24.031669Z",
+            "instructions": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
             "kind": "request",
+            "run_id": "019fe4c1-09be-77a1-8ffb-05814853fa14",
+            "conversation_id": "019fe4c1-09be-77a1-8ffb-05827742f6af",
             "metadata": null,
             "state": "complete"
           }
         ],
-        "model_settings": {},
+        "model_settings": null,
         "model_request_parameters": {
           "function_tools": [],
+          "native_tools": [],
+          "tool_visibility": null,
+          "revealed_tool_names": [],
           "output_mode": "native",
           "output_object": {
-            "json_schema": {"type": "object", "properties": {"answers": {}}}
-          }
+            "json_schema": {
+              "$defs": {
+                "ChoiceProbabilities2": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "fiction": {
+                      "description": "A novel or short story.",
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "nonfiction": {
+                      "description": "A book based on facts, real events, or ideas.",
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "fiction",
+                    "nonfiction"
+                  ],
+                  "title": "ChoiceProbabilities2",
+                  "type": "object"
+                },
+                "ScoreProbabilities1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "0": {
+                      "description": "Horrendous. Unreadable garbage.",
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "1": {
+                      "description": "Pretty bad, but theoretically readable.",
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "2": {
+                      "description": "Acceptable, but just barely.",
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "3": {
+                      "description": "Pretty good. Worth reading but not perfect.",
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "4": {
+                      "description": "Transcendent and impactful. A must read.",
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "0",
+                    "1",
+                    "2",
+                    "3",
+                    "4"
+                  ],
+                  "title": "ScoreProbabilities1",
+                  "type": "object"
+                },
+                "TypeSafeAnswers": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "positive": {
+                      "description": "The book review is positive.",
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "stars": {
+                      "$ref": "#/$defs/ScoreProbabilities1",
+                      "description": "Star rating for the book based on the review."
+                    },
+                    "genre": {
+                      "$ref": "#/$defs/ChoiceProbabilities2",
+                      "description": "Which genre this review is about."
+                    }
+                  },
+                  "required": [
+                    "positive",
+                    "stars",
+                    "genre"
+                  ],
+                  "title": "TypeSafeAnswers",
+                  "type": "object"
+                }
+              },
+              "additionalProperties": false,
+              "properties": {
+                "answers": {
+                  "$ref": "#/$defs/TypeSafeAnswers",
+                  "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key."
+                }
+              },
+              "required": [
+                "answers"
+              ],
+              "title": "TypeSafeEvaluation",
+              "type": "object"
+            },
+            "name": "TypeSafeEvaluation",
+            "description": null,
+            "strict": null
+          },
+          "output_tools": [],
+          "prompted_output_template": null,
+          "allow_text_output": true,
+          "allow_image_output": false,
+          "instruction_parts": [
+            {
+              "content": "Evaluate every question using only the supplied document.\nReturn every requested answer. Probability objects are complete probability\ndistributions: every value is between 0 and 1 and the values sum to 1.",
+              "dynamic": false,
+              "part_kind": "instruction"
+            }
+          ],
+          "thinking": null
         },
         "llm_response": {
           "parts": [
             {
-              "content": "{\"answers\": {...}}",
+              "content": "{\"answers\":{\"positive\":1,\"stars\":{\"0\":0,\"1\":0,\"2\":0,\"3\":0,\"4\":1},\"genre\":{\"fiction\":1,\"nonfiction\":0}}}",
+              "id": "msg_0a1823890936afc8006a77d40894e0819999a41a53a424aa2b",
+              "provider_name": "openai",
+              "provider_details": null,
               "part_kind": "text"
             }
           ],
+          "usage": {
+            "input_tokens": 621,
+            "cache_write_tokens": 0,
+            "cache_read_tokens": 0,
+            "output_tokens": 42,
+            "input_audio_tokens": 0,
+            "cache_audio_read_tokens": 0,
+            "output_audio_tokens": 0,
+            "details": {
+              "reasoning_tokens": 0
+            },
+            "cost": "0.00011835",
+            "output_reasoning_tokens": 0
+          },
           "model_name": "gpt-4o-mini-2024-07-18",
+          "timestamp": "2026-08-09T04:21:24.227338Z",
           "kind": "response",
           "provider_name": "openai",
+          "provider_url": "https://api.openai.com/v1/",
+          "provider_details": {
+            "finish_reason": "completed",
+            "timestamp": "2026-08-09T01:12:40Z"
+          },
+          "provider_response_id": "resp_0a1823890936afc8006a77d408109c81998fae2f20faf926b8",
           "finish_reason": "stop",
+          "run_id": "019fe4c1-09be-77a1-8ffb-05814853fa14",
+          "conversation_id": "019fe4c1-09be-77a1-8ffb-05827742f6af",
+          "metadata": null,
           "state": "complete"
         },
         "debug_info": {
-          "model_name": "gpt-4o-mini-2024-07-18",
+          "model_name": "gpt-4o-mini",
+          "model_id": "openai:gpt-4o-mini",
           "provider": "openai",
           "finish_reason": "stop"
         }
