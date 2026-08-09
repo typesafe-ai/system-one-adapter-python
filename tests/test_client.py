@@ -6,9 +6,13 @@ import json
 import httpx
 import pytest
 from pydantic_ai import ModelMessagesTypeAdapter
-from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
+from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.models.openai import OpenAIResponsesModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
+from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.usage import RequestUsage
 from typesafe_client import RetryConfig, TypeSafeClient
 from typesafe_client.api.api_client import (
@@ -198,7 +202,9 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
         ),
         (
             lambda: ModelHTTPError(
-                400, "test-model", {"message": "context_length_exceeded"}
+                400,
+                "test-model",
+                {"error": {"code": "context_length_exceeded"}},
             ),
             TypeSafeTokensExceededError,
             None,
@@ -213,6 +219,11 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
             TypeSafeTimeoutError,
             None,
         ),
+        (
+            lambda: ModelAPIError("test-model", "connection failed"),
+            TypeSafeTimeoutError,
+            None,
+        ),
         (lambda: httpx.ConnectError("connection refused"), TypeSafeTimeoutError, None),
         (lambda: TimeoutError("timed out"), TypeSafeTimeoutError, None),
         (
@@ -224,6 +235,24 @@ def test_system_one(answer_mode, response_data, async_call, structured_outputs):
             lambda: ModelHTTPError(418, "test-model", {"message": "teapot"}),
             TypeSafeUnknownError,
             418,
+        ),
+        (
+            lambda: ModelHTTPError(
+                413,
+                "test-model",
+                {"error": {"type": "request_too_large"}},
+            ),
+            TypeSafeUnknownError,
+            413,
+        ),
+        (
+            lambda: ModelHTTPError(
+                429,
+                "test-model",
+                {"error": {"message": "Too many tokens per minute"}},
+            ),
+            TypeSafeUnknownError,
+            429,
         ),
         (lambda: RuntimeError("something else"), TypeSafeUnknownError, None),
     ],
@@ -242,6 +271,61 @@ def test_provider_errors(make_error, error_type, expected_status_code):
     assert isinstance(raised.value, TypeSafeApiError)
     if error_type is TypeSafeUnknownError:
         assert raised.value.status_code == expected_status_code
+
+
+@pytest.mark.parametrize(
+    ("provider", "error_body"),
+    [
+        pytest.param(
+            "openai",
+            {
+                "error": {
+                    "message": "Your input exceeds this model's context window.",
+                    "type": "invalid_request_error",
+                    "param": "input",
+                    "code": "context_length_exceeded",
+                }
+            },
+            id="openai",
+        ),
+        pytest.param(
+            "anthropic",
+            {
+                "type": "error",
+                "error": {
+                    "type": "invalid_request_error",
+                    "message": "prompt is too long: 220256 tokens > 200000 maximum",
+                },
+                "request_id": "req_test",
+            },
+            id="anthropic",
+        ),
+    ],
+)
+def test_provider_context_window_errors_are_mapped(provider, error_body):
+    def return_provider_error(request):
+        return httpx.Response(400, json=error_body, request=request)
+
+    http_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(return_provider_error)
+    )
+    if provider == "openai":
+        model = OpenAIResponsesModel(
+            "gpt-4o-mini",
+            provider=OpenAIProvider(api_key="test", http_client=http_client),
+        )
+    else:
+        model = AnthropicModel(
+            "claude-haiku-4-5",
+            provider=AnthropicProvider(api_key="test", http_client=http_client),
+        )
+
+    with pytest.raises(TypeSafeTokensExceededError):
+        TypeSafeClientAdapter().system_one(
+            model,
+            "document",
+            {"answer": QUESTIONS["positive"]},
+        )
 
 
 @pytest.mark.parametrize("async_call", [False, True])

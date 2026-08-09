@@ -220,6 +220,9 @@ LLM response:
   - replay is the default and needs no credentials or network; the whole client stack runs against recorded provider traffic
   - re-record with `uv run pytest tests/test_live_apis.py --record-mode=rewrite`, which makes real billable calls and needs `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `TYPESAFE_API_KEY`
   - request/response credentials are stripped at record time (see `tests/conftest.py`); matching includes the request body because every call posts to the same endpoint
+- Exception handling tests use deterministic provider-shaped HTTP responses passed through the real provider SDK and PydanticAI adapter stacks
+  - they do not guarantee future provider payload compatibility; revalidate them against live APIs after provider or SDK changes
+  - OpenAI supplies `context_length_exceeded`; Anthropic currently supplies a generic `invalid_request_error` with a `prompt is too long` message, so its context-window mapping requires particular caution
 - Compatibility scope
   - `TypeSafeClientAdapter` subclasses `TypeSafeClient`
   - supports synchronous and asynchronous `system_one`, context management, `close`, and `aclose`

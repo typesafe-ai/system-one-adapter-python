@@ -1,13 +1,12 @@
-"""Provider error mapping and retry classification."""
+"""Provider error mapping and retry handling."""
 
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
-import anthropic
 import httpx
-import openai
+from pydantic_ai import ModelAPIError, ModelHTTPError
 from typesafe_client import RetryConfig
 from typesafe_client.api.api_client import (
     TypeSafeApiError,
@@ -15,24 +14,6 @@ from typesafe_client.api.api_client import (
     TypeSafeTimeoutError,
     TypeSafeTokensExceededError,
     TypeSafeUnknownError,
-)
-
-_AUTH_ERRORS = (openai.AuthenticationError, anthropic.AuthenticationError)
-_CONNECTION_ERRORS = (
-    openai.APITimeoutError,
-    openai.APIConnectionError,
-    anthropic.APITimeoutError,
-    anthropic.APIConnectionError,
-    httpx.RequestError,
-    TimeoutError,
-)
-_TOKEN_ERROR_MARKERS = (
-    "context_length_exceeded",
-    "context window",
-    "maximum context",
-    "prompt is too long",
-    "request too large",
-    "too many tokens",
 )
 
 ResultT = TypeVar("ResultT")
@@ -51,10 +32,14 @@ def run_with_retries(
     for attempt in range(1, retry.max_attempts + 1):
         try:
             return function(), attempt - 1
-        except Exception as error:  # noqa: BLE001 - unknown providers vary
-            _raise_for_nonretryable(error, attempt, retry.max_attempts)
-            delay = retry.next_delay(attempt=attempt)
-            if delay:
+        except Exception as error:
+            mapped_error = _map_provider_exception_to_typesafe_api_error(error)
+            retryable = isinstance(mapped_error, TypeSafeTimeoutError) or (
+                mapped_error.is_retryable()
+            )
+            if attempt == retry.max_attempts or not retryable:
+                raise mapped_error from error
+            if delay := retry.next_delay(attempt=attempt):
                 time.sleep(delay)
 
     raise AssertionError("retry loop did not return or raise")
@@ -73,33 +58,17 @@ async def run_with_retries_async(
     for attempt in range(1, retry.max_attempts + 1):
         try:
             return await function(), attempt - 1
-        except Exception as error:  # noqa: BLE001 - unknown providers vary
-            _raise_for_nonretryable(error, attempt, retry.max_attempts)
-            delay = retry.next_delay(attempt=attempt)
-            if delay:
+        except Exception as error:
+            mapped_error = _map_provider_exception_to_typesafe_api_error(error)
+            retryable = isinstance(mapped_error, TypeSafeTimeoutError) or (
+                mapped_error.is_retryable()
+            )
+            if attempt == retry.max_attempts or not retryable:
+                raise mapped_error from error
+            if delay := retry.next_delay(attempt=attempt):
                 await asyncio.sleep(delay)
 
     raise AssertionError("retry loop did not return or raise")
-
-
-def _raise_for_nonretryable(
-    error: Exception,
-    attempt: int,
-    max_attempts: int,
-) -> None:
-    """Raise a mapped error when another provider attempt is not allowed.
-
-    :param error: Original provider or PydanticAI error.
-    :param attempt: Current one-based attempt number.
-    :param max_attempts: Maximum provider attempts.
-    """
-    mapped_error = _map_provider_exception_to_typesafe_api_error(error)
-    if attempt >= max_attempts or not _is_retryable_provider_exception(
-        error,
-        mapped_error,
-    ):
-        raise mapped_error from error
-
 
 def _map_provider_exception_to_typesafe_api_error(
     error: Exception,
@@ -107,56 +76,24 @@ def _map_provider_exception_to_typesafe_api_error(
     if isinstance(error, TypeSafeApiError):
         return error
 
-    chain = _collect_exception_cause_chain(error)
     detail = {"message": str(error)}
-    if any(isinstance(item, _AUTH_ERRORS) for item in chain):
-        return TypeSafeAuthError(detail)
-
-    status_code = _find_http_status_code_in_exception_chain(chain)
+    status_code = error.status_code if isinstance(error, ModelHTTPError) else None
     if status_code in (401, 403):
         return TypeSafeAuthError(detail)
-    if any(isinstance(item, _CONNECTION_ERRORS) for item in chain) or status_code in (
-        408,
-        504,
-    ):
+    is_connection_error = isinstance(error, (httpx.RequestError, TimeoutError)) or (
+        isinstance(error, ModelAPIError) and not isinstance(error, ModelHTTPError)
+    )
+    if is_connection_error or status_code in (408, 504):
         return TypeSafeTimeoutError(detail)
 
-    error_text = " ".join(str(item).lower() for item in chain)
-    if any(marker in error_text for marker in _TOKEN_ERROR_MARKERS):
+    body = error.body if isinstance(error, ModelHTTPError) else None
+    provider_error = body.get("error", body) if isinstance(body, dict) else {}
+    context_window_exceeded = isinstance(provider_error, dict) and (
+        provider_error.get("code") == "context_length_exceeded"
+        or str(provider_error.get("message", "")).lower().startswith(
+            "prompt is too long"
+        )
+    )
+    if status_code == 400 and context_window_exceeded:
         return TypeSafeTokensExceededError(detail)
     return TypeSafeUnknownError(detail, status_code)
-
-
-def _is_retryable_provider_exception(
-    error: Exception,
-    mapped_error: TypeSafeApiError,
-) -> bool:
-    chain = _collect_exception_cause_chain(error)
-    if any(isinstance(item, _CONNECTION_ERRORS) for item in chain):
-        return True
-    if (
-        _find_http_status_code_in_exception_chain(chain)
-        in TypeSafeUnknownError.retryable_status_codes
-    ):
-        return True
-    return (
-        isinstance(mapped_error, TypeSafeUnknownError) and mapped_error.is_retryable()
-    )
-
-
-def _collect_exception_cause_chain(error: Exception) -> list[BaseException]:
-    chain: list[BaseException] = []
-    current: BaseException | None = error
-    while current is not None and current not in chain:
-        chain.append(current)
-        current = current.__cause__ or current.__context__
-    return chain
-
-
-def _find_http_status_code_in_exception_chain(
-    chain: list[BaseException],
-) -> int | None:
-    return next(
-        (item.status_code for item in chain if hasattr(item, "status_code")),
-        None,
-    )
