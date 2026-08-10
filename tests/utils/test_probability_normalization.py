@@ -9,6 +9,13 @@ from typesafe_client_adapter.utils.probability_normalization import (
 
 
 @pytest.mark.parametrize(
+    "probability_representation",
+    [
+        pytest.param("object", id="object"),
+        pytest.param("array", id="array"),
+    ],
+)
+@pytest.mark.parametrize(
     (
         "normalization_enabled",
         "raw_probability",
@@ -41,6 +48,7 @@ from typesafe_client_adapter.utils.probability_normalization import (
     ],
 )
 def test_probability_normalization_and_debug_data(
+    probability_representation,
     normalization_enabled,
     raw_probability,
     expected_probability,
@@ -48,17 +56,25 @@ def test_probability_normalization_and_debug_data(
     expected_max_error,
     expected_probability_errors,
 ):
+    score_probabilities = {"0": raw_probability, "1": raw_probability}
+    choice_probabilities = {
+        "fiction": raw_probability,
+        "nonfiction": raw_probability,
+    }
+    if probability_representation == "array":
+        score_probabilities = list(score_probabilities.values())
+        choice_probabilities = list(choice_probabilities.values())
     probability_normalizations = {
         "positive": None,
         "stars": normalize_probabilities_of_all_answers(
             ["0", "1"],
-            {"0": raw_probability, "1": raw_probability},
+            score_probabilities,
             "probabilities",
             normalization_enabled,
         ),
         "genre": normalize_probabilities_of_all_answers(
             ["fiction", "nonfiction"],
-            {"fiction": raw_probability, "nonfiction": raw_probability},
+            choice_probabilities,
             "probabilities",
             normalization_enabled,
         ),

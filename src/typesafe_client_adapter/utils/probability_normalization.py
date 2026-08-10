@@ -92,7 +92,13 @@ def normalize_probabilities_of_all_answers(
         probabilities = {answer: float(answer == selected) for answer in answers}
         return ProbabilityNormalization(probabilities)
 
-    original_probabilities = {answer: float(value[answer]) for answer in answers}
+    if isinstance(value, Mapping):
+        answer_probabilities = ((answer, value[answer]) for answer in answers)
+    else:
+        answer_probabilities = zip(answers, value, strict=True)
+    original_probabilities = {
+        answer: float(probability) for answer, probability in answer_probabilities
+    }
     total = sum(original_probabilities.values())
     error = abs(total - 1.0)
     if not enabled or error <= PROBABILITY_TOLERANCE:
