@@ -380,6 +380,11 @@ Repeating a request does not guarantee identical nondeterministic model output.
   - `structured_outputs=True` uses the provider's native structured-output mode
 - Answer mode
   - `llm_answer_mode="probabilities"` requests probability distributions
+  - `compact_probability_arrays=True`
+    - requires `llm_answer_mode="probabilities"`
+    - requests fixed-length probability arrays for Choice and Score questions
+    - supplies array order, labels, and criteria in each field description
+    - preserves keyed probability objects in the returned TypeSafe response
   - `llm_answer_mode="discrete"` maps the selected value to a probability distribution of all 0s except one value of 1.0
 - Question validation
   - score and choice questions require at least two criteria

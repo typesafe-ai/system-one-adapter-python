@@ -66,6 +66,14 @@ For Score questions, return each rubric level's probability of matching the docu
 Preserve genuine uncertainty. Use a one-hot distribution only when the document rules
 out every alternative. Choice and Score probability objects must include every allowed
 value, keep each probability between 0 and 1, and sum to 1."""
+_COMPACT_PROBABILITY_SYSTEM_PROMPT = _BASE_SYSTEM_PROMPT + """
+For Noul questions, return the probability that the answer is yes or the assertion is
+true. For Choice questions, return an ordered array containing each option's probability
+of being the best answer. For Score questions, return an ordered array containing each
+rubric level's probability of matching the document. Preserve genuine uncertainty. Use
+a one-hot distribution only when the document rules out every alternative. Choice and
+Score probability arrays must include one value per allowed answer, keep each value
+between 0 and 1, and sum to 1."""
 _DISCRETE_SYSTEM_PROMPT = _BASE_SYSTEM_PROMPT + """
 Return exactly one allowed value for each question."""
 _PROMPTED_OUTPUT_TEMPLATE = """Return one JSON object that matches this schema exactly:
@@ -219,6 +227,8 @@ class TypeSafeClientAdapter(TypeSafeClient):
     :param normalize_probabilities: Normalize invalid LLM probabilities when true.
     :param n_retry_malformed_structure: Corrective retries for malformed model output.
     :param retry: Retry policy for transient provider failures.
+    :param compact_probability_arrays: Request ordered probability arrays for Choice
+        and Score questions, reducing structured-output grammar size.
     """
 
     def __init__(
@@ -228,6 +238,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         normalize_probabilities: bool = False,
         n_retry_malformed_structure: int = 0,
         retry: RetryConfig = NoRetries(),  # noqa: B008 - reference-compatible signature
+        compact_probability_arrays: bool = False,
     ) -> None:
         # ``TypeSafeClient.__init__`` is deliberately not called: it requires a TypeSafe
         # API key and builds ``self._api_client``, neither of which this client uses.
@@ -237,10 +248,15 @@ class TypeSafeClientAdapter(TypeSafeClient):
             raise ValueError("llm_answer_mode must be 'probabilities' or 'discrete'")
         if n_retry_malformed_structure < 0:
             raise ValueError("n_retry_malformed_structure must be >= 0")
+        if compact_probability_arrays and llm_answer_mode != "probabilities":
+            raise ValueError(
+                "compact_probability_arrays requires llm_answer_mode='probabilities'"
+            )
 
         self.structured_outputs = structured_outputs
         self.llm_answer_mode = llm_answer_mode
         self.normalize_probabilities = normalize_probabilities
+        self.compact_probability_arrays = compact_probability_arrays
         self.n_retry_malformed_structure = n_retry_malformed_structure
         self.retry = retry
 
@@ -256,6 +272,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         output_model = create_llm_output_model(
             prepared_questions,
             self.llm_answer_mode,
+            self.compact_probability_arrays,
         )
         if self.structured_outputs:
             requested_output: Any = NativeOutput(output_model)
@@ -264,11 +281,12 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 output_model,
                 template=_PROMPTED_OUTPUT_TEMPLATE,
             )
-        system_prompt = (
-            _PROBABILITY_SYSTEM_PROMPT
-            if self.llm_answer_mode == "probabilities"
-            else _DISCRETE_SYSTEM_PROMPT
-        )
+        if self.compact_probability_arrays:
+            system_prompt = _COMPACT_PROBABILITY_SYSTEM_PROMPT
+        elif self.llm_answer_mode == "probabilities":
+            system_prompt = _PROBABILITY_SYSTEM_PROMPT
+        else:
+            system_prompt = _DISCRETE_SYSTEM_PROMPT
         pydantic_model: str | Model = model
         if isinstance(model, str) and ":" not in model:
             if model.startswith(("gpt-", "chatgpt-", "o1", "o3", "o4")):
