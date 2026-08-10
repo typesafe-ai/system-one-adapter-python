@@ -24,7 +24,7 @@ def convert_question_collection_to_validated_api_question_models(
     """Convert a question collection to validated API question models.
 
     Reject empty collections, convert dictionary questions to API model instances,
-    and require score and choice questions to define at least one criterion.
+    and require score and choice questions to define at least two criteria.
 
     :param questions: TypeSafe question collection.
     :return: Questions using API model types.
@@ -36,10 +36,10 @@ def convert_question_collection_to_validated_api_question_models(
         prepared_question = question_to_api_model(question)
         if (
             isinstance(prepared_question, (ScoreQuestion, ChoiceQuestion))
-            and not prepared_question.criteria
+            and len(prepared_question.criteria) < 2
         ):
             raise ValueError(
-                "Score and choice questions require at least one criterion."
+                "Score and choice questions require at least two criteria."
             )
         prepared_questions[key] = prepared_question
     return prepared_questions

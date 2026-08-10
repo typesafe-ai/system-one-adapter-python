@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "ChoiceProbabilities2": {
+      "additionalProperties": false,
+      "properties": {
+        "fiction": {
+          "description": "A story.",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "nonfiction": {
+          "description": "Facts.",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "fiction",
+        "nonfiction"
+      ],
+      "title": "ChoiceProbabilities2",
+      "type": "object"
+    },
+    "ScoreProbabilities1": {
+      "additionalProperties": false,
+      "properties": {
+        "0": {
+          "description": "Bad.",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "1": {
+          "description": "Good.",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "0",
+        "1"
+      ],
+      "title": "ScoreProbabilities1",
+      "type": "object"
+    },
+    "TypeSafeAnswers": {
+      "additionalProperties": false,
+      "properties": {
+        "genre": {
+          "$ref": "#/$defs/ChoiceProbabilities2",
+          "description": "Genre."
+        },
+        "positive": {
+          "description": "The review is positive.",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "stars": {
+          "$ref": "#/$defs/ScoreProbabilities1",
+          "description": "Rating."
+        }
+      },
+      "required": [
+        "positive",
+        "stars",
+        "genre"
+      ],
+      "title": "TypeSafeAnswers",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "answers": {
+      "$ref": "#/$defs/TypeSafeAnswers",
+      "description": "Exactly one answer per property below. Use these property names verbatim and do not add, rename, or nest them under any other key."
+    }
+  },
+  "required": [
+    "answers"
+  ],
+  "title": "TypeSafeEvaluation",
+  "type": "object"
+}
