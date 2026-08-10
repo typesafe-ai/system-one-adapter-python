@@ -4,13 +4,13 @@
       "additionalProperties": false,
       "properties": {
         "positive": {
-          "description": "The review is positive.",
+          "description": "Probability that the answer is yes or the assertion is true. 0 means no or false, 0.5 means uncertain, and 1 means yes or true.\nQuestion: The review is positive.",
           "maximum": 1,
           "minimum": 0,
           "type": "number"
         },
         "stars": {
-          "description": "Rating.\nProbability array order:\n0 = Bad.\n1 = Good.",
+          "description": "Each array value is the probability that the document matches that rubric level.\nQuestion: Rating.\nProbability array order:\n0 = Bad.\n1 = Good.",
           "items": {
             "maximum": 1,
             "minimum": 0,
@@ -21,7 +21,7 @@
           "type": "array"
         },
         "genre": {
-          "description": "Genre.\nProbability array order:\nfiction = A story.\nnonfiction = Facts.",
+          "description": "Each array value is the probability that its option is the best answer.\nQuestion: Genre.\nProbability array order:\nfiction = A story.\nnonfiction = Facts.",
           "items": {
             "maximum": 1,
             "minimum": 0,

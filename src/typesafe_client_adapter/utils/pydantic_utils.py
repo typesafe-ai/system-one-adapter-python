@@ -166,6 +166,26 @@ def _build_llm_output_field_description(
     compact_probability_arrays: bool,
 ) -> str:
     description = _serialize_instruction_value_for_prompt(question.instructions)
+    if isinstance(question, NoulQuestion) and llm_answer_mode == "probabilities":
+        description = (
+            "Probability that the answer is yes or the assertion is true. "
+            "0 means no or false, 0.5 means uncertain, and 1 means yes or true.\n"
+            f"Question: {description}"
+        )
+    elif isinstance(question, ScoreQuestion) and llm_answer_mode == "probabilities":
+        probability_value = "array value" if compact_probability_arrays else "property"
+        description = (
+            f"Each {probability_value} is the probability that the document matches "
+            f"that rubric level.\nQuestion: {description}"
+        )
+    elif isinstance(question, ChoiceQuestion) and llm_answer_mode == "probabilities":
+        probability_value = "array value" if compact_probability_arrays else "property"
+        description = (
+            f"Each {probability_value} is the probability that its option is the best "
+            "answer.\n"
+            f"Question: {description}"
+        )
+
     if isinstance(question, ScoreQuestion) and (
         llm_answer_mode == "discrete" or compact_probability_arrays
     ):
