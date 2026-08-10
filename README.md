@@ -430,8 +430,11 @@ Repeating a request does not guarantee identical nondeterministic model output.
   - supports synchronous and asynchronous `system_one`, context management, `close`, and `aclose`
   - accepts the same documents and question models and returns the same response models
 - `SystemOneResponse` includes `.model`, `.answers`, `.usage`, and `.debug`; each answer includes `.type`.
-- Provider SDK exceptions are mapped onto reference-shaped error types: 
-  - TypeSafeAuthError (bad key), TypeSafeTimeoutError (timeouts and connection failures) 
-  - TypeSafeTokensExceededError (context window exceeded, including 413 `request_too_large`)
-  - TypeSafeUnknownError (everything else, carrying the HTTP status_code)
-  - All inherit from TypeSafeApiError
+- Provider errors default to PydanticAI's native error types.
+  - `ModelHTTPError` exposes the HTTP status, body, headers, and retry delay.
+  - `ModelAPIError` covers provider connection failures.
+  - Set `error_mode="typesafe"` to translate failures into reference-shaped errors:
+    - TypeSafeAuthError (bad key), TypeSafeTimeoutError (timeouts and connection failures)
+    - TypeSafeTokensExceededError (context window exceeded, including 413 `request_too_large`)
+    - TypeSafeUnknownError (everything else, carrying the HTTP status_code)
+    - All inherit from TypeSafeApiError

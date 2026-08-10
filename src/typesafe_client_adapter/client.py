@@ -34,6 +34,7 @@ from typesafe_client_adapter.utils.confidence_metrics import (
     score_confidence,
 )
 from typesafe_client_adapter.utils.error_handling import (
+    ErrorMode,
     run_with_retries,
     run_with_retries_async,
 )
@@ -229,6 +230,8 @@ class TypeSafeClientAdapter(TypeSafeClient):
     :param retry: Retry policy for transient provider failures.
     :param compact_probability_arrays: Request ordered probability arrays for Choice
         and Score questions, reducing structured-output grammar size.
+    :param error_mode: Expose native PydanticAI errors or translate them to TypeSafe
+        error types.
     """
 
     def __init__(
@@ -239,6 +242,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         n_retry_malformed_structure: int = 0,
         retry: RetryConfig = NoRetries(),  # noqa: B008 - reference-compatible signature
         compact_probability_arrays: bool = False,
+        error_mode: ErrorMode = "pydantic_ai",
     ) -> None:
         # ``TypeSafeClient.__init__`` is deliberately not called: it requires a TypeSafe
         # API key and builds ``self._api_client``, neither of which this client uses.
@@ -252,6 +256,8 @@ class TypeSafeClientAdapter(TypeSafeClient):
             raise ValueError(
                 "compact_probability_arrays requires llm_answer_mode='probabilities'"
             )
+        if error_mode not in ("pydantic_ai", "typesafe"):
+            raise ValueError("error_mode must be 'pydantic_ai' or 'typesafe'")
 
         self.structured_outputs = structured_outputs
         self.llm_answer_mode = llm_answer_mode
@@ -259,6 +265,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         self.compact_probability_arrays = compact_probability_arrays
         self.n_retry_malformed_structure = n_retry_malformed_structure
         self.retry = retry
+        self.error_mode = error_mode
 
     def _evaluation(
         self,
@@ -331,6 +338,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         result, n_retries = run_with_retries(
             run_pydantic_agent_attempt,
             self.retry,
+            error_mode=self.error_mode,
         )
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
@@ -353,6 +361,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         result, n_retries = await run_with_retries_async(
             run_pydantic_agent_attempt_async,
             self.retry,
+            error_mode=self.error_mode,
         )
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 

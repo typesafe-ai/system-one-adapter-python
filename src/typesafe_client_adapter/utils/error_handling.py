@@ -3,7 +3,7 @@
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 import httpx
 from pydantic_ai import ModelAPIError, ModelHTTPError
@@ -17,6 +17,7 @@ from typesafe_client.api.api_client import (
 )
 
 ResultT = TypeVar("ResultT")
+ErrorMode = Literal["pydantic_ai", "typesafe"]
 RETRYABLE_HTTP_STATUS_CODES = frozenset((408, 429, 500, 502, 503, 504, 521, 522, 524))
 
 # Provider error codes and prose fragments signalling the input exceeded the model's
@@ -40,11 +41,13 @@ CONTEXT_WINDOW_MESSAGE_MARKERS = (
 def run_with_retries(
     function: Callable[[], ResultT],
     retry: RetryConfig,
+    error_mode: ErrorMode = "pydantic_ai",
 ) -> tuple[ResultT, int]:
-    """Run a synchronous provider call with mapped retries.
+    """Run a synchronous provider call with optional TypeSafe translation.
 
     :param function: Provider call.
     :param retry: Transient-failure retry policy.
+    :param error_mode: Error interface exposed after retries are exhausted.
     :return: Result and retry count.
     """
     for attempt in range(1, retry.max_attempts + 1):
@@ -53,7 +56,9 @@ def run_with_retries(
         except Exception as error:
             retryable = _is_retryable_provider_error(error)
             if attempt == retry.max_attempts or not retryable:
-                raise _translate_provider_error_to_typesafe(error) from error
+                if error_mode == "typesafe":
+                    raise _translate_provider_error_to_typesafe(error) from error
+                raise
             if delay := retry.next_delay(attempt=attempt):
                 time.sleep(delay)
 
@@ -63,11 +68,13 @@ def run_with_retries(
 async def run_with_retries_async(
     function: Callable[[], Awaitable[ResultT]],
     retry: RetryConfig,
+    error_mode: ErrorMode = "pydantic_ai",
 ) -> tuple[ResultT, int]:
-    """Run an asynchronous provider call with mapped retries.
+    """Run an asynchronous provider call with optional TypeSafe translation.
 
     :param function: Asynchronous provider call.
     :param retry: Transient-failure retry policy.
+    :param error_mode: Error interface exposed after retries are exhausted.
     :return: Result and retry count.
     """
     for attempt in range(1, retry.max_attempts + 1):
@@ -76,7 +83,9 @@ async def run_with_retries_async(
         except Exception as error:
             retryable = _is_retryable_provider_error(error)
             if attempt == retry.max_attempts or not retryable:
-                raise _translate_provider_error_to_typesafe(error) from error
+                if error_mode == "typesafe":
+                    raise _translate_provider_error_to_typesafe(error) from error
+                raise
             if delay := retry.next_delay(attempt=attempt):
                 await asyncio.sleep(delay)
 
@@ -84,12 +93,12 @@ async def run_with_retries_async(
 
 
 def _is_retryable_provider_error(error: Exception) -> bool:
-    """Decide whether a provider failure may be retried before translation.
+    """Decide whether a provider failure may be retried.
 
-    Timeouts are retried even though ``TypeSafeTimeoutError.is_retryable()`` reports
-    False. The reference client retries every ``httpx.RequestError`` before it ever
-    becomes a ``TypeSafeTimeoutError``. Retry classification therefore uses the
-    original provider error, independent of its eventual TypeSafe representation.
+    Retry classification uses the original provider error, independent of the public
+    error interface selected by ``error_mode``. Timeouts are retryable even though
+    ``TypeSafeTimeoutError.is_retryable()`` reports false because the reference client
+    retries transport failures before translating them.
 
     :param error: Exception raised by the provider call.
     :return: Whether the call may be retried.

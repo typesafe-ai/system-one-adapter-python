@@ -26,6 +26,60 @@ from typesafe_client_adapter.utils.error_handling import run_with_retries
 QUESTION = NoulQuestion(instructions="The review is positive.")
 
 
+@pytest.mark.parametrize("async_call", [False, True])
+@pytest.mark.parametrize(
+    "make_error",
+    [
+        pytest.param(
+            lambda: ModelHTTPError(503, "test-model", {"message": "unavailable"}),
+            id="model-http-error",
+        ),
+        pytest.param(
+            lambda: ModelAPIError("test-model", "connection failed"),
+            id="model-api-error",
+        ),
+        pytest.param(lambda: RuntimeError("model failed"), id="arbitrary-error"),
+    ],
+)
+def test_pydantic_ai_errors_are_preserved_by_default(async_call, make_error):
+    expected_error = make_error()
+
+    def raise_configured_provider_error(messages, agent_info):
+        raise expected_error
+
+    model = FunctionModel(raise_configured_provider_error, model_name="test-model")
+    client = TypeSafeClientAdapter(
+        structured_outputs=True,
+        llm_answer_mode="probabilities",
+    )
+
+    with pytest.raises(type(expected_error)) as raised:
+        if async_call:
+            asyncio.run(
+                client.system_one_async(
+                    model,
+                    "document",
+                    {"answer": QUESTION},
+                )
+            )
+        else:
+            client.system_one(model, "document", {"answer": QUESTION})
+
+    assert raised.value is expected_error
+
+
+def test_invalid_error_mode_is_rejected():
+    with pytest.raises(
+        ValueError,
+        match="error_mode must be 'pydantic_ai' or 'typesafe'",
+    ):
+        TypeSafeClientAdapter(
+            structured_outputs=True,
+            llm_answer_mode="probabilities",
+            error_mode="invalid",
+        )
+
+
 @pytest.mark.parametrize("status_code", [408, 504])
 def test_status_errors_are_retried(status_code):
     calls = 0
@@ -127,17 +181,25 @@ def test_status_errors_are_retried(status_code):
         (lambda: RuntimeError("something else"), TypeSafeUnknownError, None),
     ],
 )
-def test_provider_errors(make_error, error_type, expected_status_code):
+@pytest.mark.parametrize("async_call", [False, True])
+def test_provider_errors(make_error, error_type, expected_status_code, async_call):
     def raise_configured_provider_error(messages, agent_info):
         raise make_error()
 
     model = FunctionModel(raise_configured_provider_error, model_name="test-model")
 
     with pytest.raises(error_type) as raised:
-        TypeSafeClientAdapter(
+        client = TypeSafeClientAdapter(
             structured_outputs=True,
             llm_answer_mode="probabilities",
-        ).system_one(model, "document", {"answer": QUESTION})
+            error_mode="typesafe",
+        )
+        if async_call:
+            asyncio.run(
+                client.system_one_async(model, "document", {"answer": QUESTION})
+            )
+        else:
+            client.system_one(model, "document", {"answer": QUESTION})
 
     assert isinstance(raised.value, TypeSafeApiError)
     if error_type is TypeSafeUnknownError:
@@ -312,6 +374,7 @@ def test_provider_context_window_errors_are_mapped(
         TypeSafeClientAdapter(
             structured_outputs=True,
             llm_answer_mode="probabilities",
+            error_mode="typesafe",
         ).system_one(model, "document", {"answer": QUESTION})
 
     if expected_error is TypeSafeUnknownError:

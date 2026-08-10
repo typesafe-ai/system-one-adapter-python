@@ -11,9 +11,6 @@ from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
 from typesafe_client import RetryConfig, TypeSafeClient
-from typesafe_client.api.api_client import (
-    TypeSafeUnknownError,
-)
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
 from typesafe_client_adapter import TypeSafeClientAdapter
@@ -346,7 +343,7 @@ def test_retries_are_exhausted(async_call):
     )
     questions = {"answer": QUESTIONS["positive"]}
 
-    with pytest.raises(TypeSafeUnknownError) as raised:
+    with pytest.raises(ModelHTTPError) as raised:
         if async_call:
             asyncio.run(client.system_one_async(model, "document", questions))
         else:

@@ -11,8 +11,10 @@ from typesafe_client.api.api_client import (
 from typesafe_client.api.retry import NoRetries
 
 from .client import TypeSafeClientAdapter
+from .utils.error_handling import ErrorMode
 
 __all__ = [
+    "ErrorMode",
     "NoRetries",
     "RetryConfig",
     "TypeSafeApiError",
