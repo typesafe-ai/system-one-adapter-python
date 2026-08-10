@@ -51,17 +51,17 @@
       "properties": {
         "genre": {
           "$ref": "#/$defs/ChoiceProbabilities2",
-          "description": "Genre."
+          "description": "Each property is the probability that its option is the best answer.\nQuestion: Genre."
         },
         "positive": {
-          "description": "The review is positive.",
+          "description": "Probability that the answer is yes or the assertion is true. 0 means no or false, 0.5 means uncertain, and 1 means yes or true.\nQuestion: The review is positive.",
           "maximum": 1,
           "minimum": 0,
           "type": "number"
         },
         "stars": {
           "$ref": "#/$defs/ScoreProbabilities1",
-          "description": "Rating."
+          "description": "Each property is the probability that the document matches that rubric level.\nQuestion: Rating."
         }
       },
       "required": [

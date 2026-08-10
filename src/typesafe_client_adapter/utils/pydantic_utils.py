@@ -153,6 +153,23 @@ def _build_llm_output_field_description(
     llm_answer_mode: AnswerMode,
 ) -> str:
     description = _serialize_instruction_value_for_prompt(question.instructions)
+    if isinstance(question, NoulQuestion) and llm_answer_mode == "probabilities":
+        description = (
+            "Probability that the answer is yes or the assertion is true. "
+            "0 means no or false, 0.5 means uncertain, and 1 means yes or true.\n"
+            f"Question: {description}"
+        )
+    elif isinstance(question, ScoreQuestion) and llm_answer_mode == "probabilities":
+        description = (
+            "Each property is the probability that the document matches that rubric "
+            f"level.\nQuestion: {description}"
+        )
+    elif isinstance(question, ChoiceQuestion) and llm_answer_mode == "probabilities":
+        description = (
+            "Each property is the probability that its option is the best answer.\n"
+            f"Question: {description}"
+        )
+
     if llm_answer_mode == "discrete":
         if isinstance(question, ScoreQuestion):
             levels = "\n".join(
