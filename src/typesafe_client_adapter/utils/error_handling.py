@@ -17,6 +17,7 @@ from typesafe_client.api.api_client import (
 )
 
 ResultT = TypeVar("ResultT")
+RETRYABLE_HTTP_STATUS_CODES = frozenset((408, 429, 500, 502, 503, 504, 521, 522, 524))
 
 # Provider error codes and prose fragments signalling the input exceeded the model's
 # context window. Providers disagree on shape, so both are checked. The codes are also
@@ -50,9 +51,9 @@ def run_with_retries(
         try:
             return function(), attempt - 1
         except Exception as error:
-            mapped_error, retryable = _map_error_and_decide_whether_to_retry(error)
+            retryable = _is_retryable_provider_error(error)
             if attempt == retry.max_attempts or not retryable:
-                raise mapped_error from error
+                raise _translate_provider_error_to_typesafe(error) from error
             if delay := retry.next_delay(attempt=attempt):
                 time.sleep(delay)
 
@@ -73,37 +74,38 @@ async def run_with_retries_async(
         try:
             return await function(), attempt - 1
         except Exception as error:
-            mapped_error, retryable = _map_error_and_decide_whether_to_retry(error)
+            retryable = _is_retryable_provider_error(error)
             if attempt == retry.max_attempts or not retryable:
-                raise mapped_error from error
+                raise _translate_provider_error_to_typesafe(error) from error
             if delay := retry.next_delay(attempt=attempt):
                 await asyncio.sleep(delay)
 
     raise AssertionError("retry loop did not return or raise")
 
 
-def _map_error_and_decide_whether_to_retry(
-    error: Exception,
-) -> tuple[TypeSafeApiError, bool]:
-    """Map a provider exception and decide whether the attempt may be retried.
+def _is_retryable_provider_error(error: Exception) -> bool:
+    """Decide whether a provider failure may be retried before translation.
 
     Timeouts are retried even though ``TypeSafeTimeoutError.is_retryable()`` reports
     False. The reference client retries every ``httpx.RequestError`` before it ever
-    becomes a ``TypeSafeTimeoutError``, so consulting ``is_retryable`` alone would make
-    transient connection failures non-retryable here. This is deliberately slightly
-    broader than the reference: HTTP 408 and 504 responses are retried too.
+    becomes a ``TypeSafeTimeoutError``. Retry classification therefore uses the
+    original provider error, independent of its eventual TypeSafe representation.
 
     :param error: Exception raised by the provider call.
-    :return: Mapped error and whether it is retryable.
+    :return: Whether the call may be retried.
     """
-    mapped_error = _map_provider_exception_to_typesafe_api_error(error)
-    retryable = isinstance(mapped_error, TypeSafeTimeoutError) or (
-        mapped_error.is_retryable()
+    if isinstance(error, TypeSafeApiError):
+        return isinstance(error, TypeSafeTimeoutError) or error.is_retryable()
+    if isinstance(error, (httpx.RequestError, TimeoutError)):
+        return True
+    if isinstance(error, ModelAPIError) and not isinstance(error, ModelHTTPError):
+        return True
+    return isinstance(error, ModelHTTPError) and (
+        error.status_code in RETRYABLE_HTTP_STATUS_CODES
     )
-    return mapped_error, retryable
 
 
-def _map_provider_exception_to_typesafe_api_error(
+def _translate_provider_error_to_typesafe(
     error: Exception,
 ) -> TypeSafeApiError:
     if isinstance(error, TypeSafeApiError):
