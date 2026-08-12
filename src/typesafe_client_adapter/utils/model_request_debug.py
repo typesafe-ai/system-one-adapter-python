@@ -6,13 +6,18 @@ from typing import Any
 
 from pydantic_ai import RunContext
 from pydantic_ai.capabilities import Hooks, WrapModelRequestHandler
-from pydantic_ai.messages import ModelResponse
+from pydantic_ai.messages import ModelResponse, RetryPromptPart
 from pydantic_ai.models import ModelRequestContext
 
+from typesafe_client_adapter.utils.error_handling import RetryReasons
 
-def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
+
+def create_model_request_debug_hooks(
+    retry_reasons: list[RetryReasons],
+) -> tuple[Hooks, dict[str, list[Any]]]:
     """Create model-request hooks and their mutable debug-data store.
 
+    :param retry_reasons: Mutable retry-reason collector.
     :return: PydanticAI hooks and aligned request, response, and metadata lists.
     """
     llm_queries: list[dict[str, Any]] = []
@@ -30,6 +35,18 @@ def create_model_request_debug_hooks() -> tuple[Hooks, dict[str, list[Any]]]:
         :param handler: Function performing the model request.
         :return: Unchanged model response.
         """
+        retry_prompt_messages = [
+            message_part.model_response()
+            for message_part in request_context.messages[-1].parts
+            if isinstance(message_part, RetryPromptPart)
+        ]
+        if retry_prompt_messages:
+            retry_reasons.append(
+                RetryReasons(
+                    category="malformed_structure",
+                    msg="\n\n".join(retry_prompt_messages),
+                )
+            )
         request_debug_info = {
             "model_name": request_context.model.model_name,
             "model_id": request_context.model.model_id,
