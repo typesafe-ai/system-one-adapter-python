@@ -208,6 +208,7 @@ Return exactly one allowed value for each question."""
     assert response.debug["max_error"] == 0
     assert response.debug["invalid_probs"] == 0
     assert response.debug["probability_errors"] == {}
+    assert response.debug["retry_reasons"] == []
 
     llm_query = response.debug["llm_attempts"][0]
     llm_response = llm_query["llm_response"]
@@ -305,6 +306,13 @@ def test_transient_errors_are_retried(async_call):
         response.debug["llm_attempts"][1]["llm_response"],
         ModelResponse,
     )
+    assert response.debug["retry_reasons"] == [
+        (
+            "provider_error",
+            "status_code: 503, model_name: test-model, body: "
+            "{'message': 'unavailable'}",
+        )
+    ]
 
 
 @pytest.mark.parametrize("async_call", [False, True])
@@ -381,6 +389,12 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 1
     assert len(response.debug["llm_attempts"]) == 3
+    assert [category for category, _ in response.debug["retry_reasons"]] == [
+        "malformed_structure",
+        "provider_error",
+    ]
+    assert "validation error" in response.debug["retry_reasons"][0][1]
+    assert "status_code: 503" in response.debug["retry_reasons"][1][1]
 
 
 @pytest.mark.parametrize(
@@ -450,3 +464,7 @@ def test_malformed_structure_is_retried():
     assert response.usage.n_retries == 0
     assert response.usage.n_retries_malformed_structure == 1
     assert len(response.debug["llm_attempts"]) == 2
+    assert len(response.debug["retry_reasons"]) == 1
+    retry_reason_category, retry_reason_msg = response.debug["retry_reasons"][0]
+    assert retry_reason_category == "malformed_structure"
+    assert "validation error" in retry_reason_msg

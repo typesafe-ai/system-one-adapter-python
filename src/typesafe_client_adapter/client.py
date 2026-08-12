@@ -34,6 +34,7 @@ from typesafe_client_adapter.utils.confidence_metrics import (
     score_confidence,
 )
 from typesafe_client_adapter.utils.error_handling import (
+    RetryReasons,
     run_with_retries,
     run_with_retries_async,
 )
@@ -150,6 +151,7 @@ class _EvaluationRun:
     questions: dict[str, Question]
     pydantic_agent: Agent
     model_request_debug_data: dict[str, list[Any]]
+    retry_reasons: list[RetryReasons]
     llm_answer_mode: AnswerMode
     should_normalize_probabilities: bool
     run_usage: RunUsage = field(default_factory=RunUsage)
@@ -208,6 +210,10 @@ class _EvaluationRun:
             debug={
                 **probability_debug_data(probability_normalizations),
                 **self.model_request_debug_data,
+                "retry_reasons": [
+                    (retry_reason.category, retry_reason.msg)
+                    for retry_reason in self.retry_reasons
+                ],
             },
         )
 
@@ -275,8 +281,9 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 pydantic_model = f"openai:{model}"
             elif model.startswith("claude-"):
                 pydantic_model = f"anthropic:{model}"
+        retry_reasons: list[RetryReasons] = []
         model_request_debug_hooks, model_request_debug_data = (
-            create_model_request_debug_hooks()
+            create_model_request_debug_hooks(retry_reasons)
         )
         pydantic_agent = Agent(
             pydantic_model,
@@ -290,6 +297,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
             questions=prepared_questions,
             pydantic_agent=pydantic_agent,
             model_request_debug_data=model_request_debug_data,
+            retry_reasons=retry_reasons,
             llm_answer_mode=self.llm_answer_mode,
             should_normalize_probabilities=self.normalize_probabilities,
         )
@@ -313,6 +321,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         result, n_retries = run_with_retries(
             run_pydantic_agent_attempt,
             self.retry,
+            evaluation.retry_reasons,
         )
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
@@ -335,6 +344,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         result, n_retries = await run_with_retries_async(
             run_pydantic_agent_attempt_async,
             self.retry,
+            evaluation.retry_reasons,
         )
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 

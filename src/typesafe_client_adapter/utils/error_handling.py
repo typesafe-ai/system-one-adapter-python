@@ -3,7 +3,8 @@
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from dataclasses import dataclass
+from typing import Literal, TypeVar
 
 import httpx
 from pydantic_ai import ModelAPIError, ModelHTTPError
@@ -18,6 +19,19 @@ from typesafe_client.api.api_client import (
 
 ResultT = TypeVar("ResultT")
 RETRYABLE_HTTP_STATUS_CODES = frozenset((408, 429, 500, 502, 503, 504, 521, 522, 524))
+
+
+@dataclass(frozen=True)
+class RetryReasons:
+    """Reason for performing one retry.
+
+    :param category: Retry mechanism that requested another attempt.
+    :param msg: Detailed retry cause.
+    """
+
+    category: Literal["provider_error", "malformed_structure"]
+    msg: str
+
 
 # Provider error codes and prose fragments signalling the input exceeded the model's
 # context window. Providers disagree on shape, so both are checked. The codes are also
@@ -40,11 +54,13 @@ CONTEXT_WINDOW_MESSAGE_MARKERS = (
 def run_with_retries(
     function: Callable[[], ResultT],
     retry: RetryConfig,
+    retry_reasons: list[RetryReasons] | None = None,
 ) -> tuple[ResultT, int]:
     """Run a synchronous provider call with mapped retries.
 
     :param function: Provider call.
     :param retry: Transient-failure retry policy.
+    :param retry_reasons: Mutable retry-reason collector.
     :return: Result and retry count.
     """
     for attempt in range(1, retry.max_attempts + 1):
@@ -54,6 +70,10 @@ def run_with_retries(
             retryable = _is_retryable_provider_error(error)
             if attempt == retry.max_attempts or not retryable:
                 raise _translate_provider_error_to_typesafe(error) from error
+            if retry_reasons is not None:
+                retry_reasons.append(
+                    RetryReasons(category="provider_error", msg=str(error))
+                )
             if delay := retry.next_delay(attempt=attempt):
                 time.sleep(delay)
 
@@ -63,11 +83,13 @@ def run_with_retries(
 async def run_with_retries_async(
     function: Callable[[], Awaitable[ResultT]],
     retry: RetryConfig,
+    retry_reasons: list[RetryReasons] | None = None,
 ) -> tuple[ResultT, int]:
     """Run an asynchronous provider call with mapped retries.
 
     :param function: Asynchronous provider call.
     :param retry: Transient-failure retry policy.
+    :param retry_reasons: Mutable retry-reason collector.
     :return: Result and retry count.
     """
     for attempt in range(1, retry.max_attempts + 1):
@@ -77,6 +99,10 @@ async def run_with_retries_async(
             retryable = _is_retryable_provider_error(error)
             if attempt == retry.max_attempts or not retryable:
                 raise _translate_provider_error_to_typesafe(error) from error
+            if retry_reasons is not None:
+                retry_reasons.append(
+                    RetryReasons(category="provider_error", msg=str(error))
+                )
             if delay := retry.next_delay(attempt=attempt):
                 await asyncio.sleep(delay)
 

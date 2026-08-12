@@ -137,6 +137,7 @@ TypeSafeClientAdapter response:
     "max_error": 0.0,
     "invalid_probs": 0,
     "probability_errors": {},
+    "retry_reasons": [],
     "llm_attempts": [
       {
         "messages": [
@@ -342,6 +343,7 @@ Repeating a request does not guarantee identical nondeterministic model output.
   - `invalid_probs` counts answers whose probability error exceeds `1e-6`
   - `probability_errors` maps invalid question IDs to their errors
   - `original_probabilities` contains LLM outputs changed by normalization and is omitted when empty
+  - `retry_reasons` contains chronological `(category, message)` tuples for `provider_error` and `malformed_structure` retries; JSON serialization emits each tuple as a two-item array
   - `llm_attempts` contains one dictionary per PydanticAI model attempt
     - each dictionary contains native PydanticAI messages, model settings, and `ModelRequestParameters`; `model_dump(mode="json")` serializes them
     - request parameters preserve function tools, output tools, output mode, and the structured-output schema needed to reconstruct the call
