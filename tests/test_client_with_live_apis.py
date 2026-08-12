@@ -149,6 +149,7 @@ def test_live_responses_match_reference_shape(
     assert_live_response_matches_reference(response, request)
 
 
+# TypeSafe is outside the live test's provider x output-mode x answer-mode param grid.
 @pytest.mark.vcr
 def test_live_typesafe_response_matches_reference_shape(request):
     client = TypeSafeClient(api_key=os.environ["TYPESAFE_API_KEY"])
