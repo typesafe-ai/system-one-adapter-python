@@ -48,22 +48,18 @@ def convert_question_collection_to_validated_api_question_models(
 def create_llm_output_model(
     questions: Mapping[str, Question],
     llm_answer_mode: AnswerMode,
-    compact_probability_arrays: bool = False,
 ) -> type[BaseModel]:
     """Create the complete Pydantic output model.
 
     :param questions: Prepared questions.
     :param llm_answer_mode: Probability or discrete answer mode.
-    :param compact_probability_arrays: Use ordered arrays for probability answers.
     :return: Dynamic Pydantic output model.
     """
     fields = {}
     for index, (question_id, question) in enumerate(questions.items()):
         answer_type = _create_llm_answer_type_for_question(
-            index,
             question,
             llm_answer_mode,
-            compact_probability_arrays,
         )
         fields[f"answer_{index}"] = (
             answer_type,
@@ -72,7 +68,6 @@ def create_llm_output_model(
                 description=_build_llm_output_field_description(
                     question,
                     llm_answer_mode,
-                    compact_probability_arrays,
                 ),
             ),
         )
@@ -100,10 +95,8 @@ def create_llm_output_model(
 
 
 def _create_llm_answer_type_for_question(
-    index: int,
     question: Question,
     llm_answer_mode: AnswerMode,
-    compact_probability_arrays: bool,
 ) -> Any:
     if isinstance(question, NoulQuestion):
         return bool if llm_answer_mode == "discrete" else Probability
@@ -112,58 +105,20 @@ def _create_llm_answer_type_for_question(
         if llm_answer_mode == "discrete":
             return Annotated[int, Field(ge=0, lt=len(question.criteria))]
         answers = [str(score) for score in range(len(question.criteria))]
-        descriptions = [
-            _serialize_instruction_value_for_prompt(value)
-            for value in question.criteria
-        ]
-        probability_model_name = f"ScoreProbabilities{index}"
     else:
         answers = list(question.criteria)
         if llm_answer_mode == "discrete":
             return Literal.__getitem__(tuple(answers))
-        descriptions = [
-            _serialize_instruction_value_for_prompt(value)
-            for value in question.criteria.values()
-        ]
-        probability_model_name = f"ChoiceProbabilities{index}"
 
-    if compact_probability_arrays:
-        return Annotated[
-            list[Probability],
-            Field(min_length=len(answers), max_length=len(answers)),
-        ]
-    return _create_probability_output_model_for_answers(
-        probability_model_name,
-        answers,
-        descriptions,
-    )
-
-
-def _create_probability_output_model_for_answers(
-    name: str,
-    answers: list[str],
-    descriptions: list[str],
-) -> type[BaseModel]:
-    fields = {
-        f"value_{index}": (
-            Probability,
-            Field(alias=answer, description=description),
-        )
-        for index, (answer, description) in enumerate(
-            zip(answers, descriptions, strict=True)
-        )
-    }
-    return create_model(
-        name,
-        __config__=ConfigDict(extra="forbid"),
-        **fields,
-    )
+    return Annotated[
+        list[Probability],
+        Field(min_length=len(answers), max_length=len(answers)),
+    ]
 
 
 def _build_llm_output_field_description(
     question: Question,
     llm_answer_mode: AnswerMode,
-    compact_probability_arrays: bool,
 ) -> str:
     description = _serialize_instruction_value_for_prompt(question.instructions)
     if isinstance(question, NoulQuestion) and llm_answer_mode == "probabilities":
@@ -173,22 +128,18 @@ def _build_llm_output_field_description(
             f"Question: {description}"
         )
     elif isinstance(question, ScoreQuestion) and llm_answer_mode == "probabilities":
-        probability_value = "array value" if compact_probability_arrays else "property"
         description = (
-            f"Each {probability_value} is the probability that the document matches "
+            "Each array value is the probability that the document matches "
             f"that rubric level.\nQuestion: {description}"
         )
     elif isinstance(question, ChoiceQuestion) and llm_answer_mode == "probabilities":
-        probability_value = "array value" if compact_probability_arrays else "property"
         description = (
-            f"Each {probability_value} is the probability that its option is the best "
+            "Each array value is the probability that its option is the best "
             "answer.\n"
             f"Question: {description}"
         )
 
-    if isinstance(question, ScoreQuestion) and (
-        llm_answer_mode == "discrete" or compact_probability_arrays
-    ):
+    if isinstance(question, ScoreQuestion):
         levels = "\n".join(
             f"{score} = {_serialize_instruction_value_for_prompt(criterion)}"
             for score, criterion in enumerate(question.criteria)
@@ -197,9 +148,7 @@ def _build_llm_output_field_description(
             return f"{description}\nScore levels, answer with the integer:\n{levels}"
         return f"{description}\nProbability array order:\n{levels}"
 
-    if isinstance(question, ChoiceQuestion) and (
-        llm_answer_mode == "discrete" or compact_probability_arrays
-    ):
+    if isinstance(question, ChoiceQuestion):
         choices = "\n".join(
             f"{answer} = {_serialize_instruction_value_for_prompt(criterion)}"
             for answer, criterion in question.criteria.items()
