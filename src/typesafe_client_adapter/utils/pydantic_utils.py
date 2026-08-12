@@ -2,11 +2,9 @@
 
 import json
 from collections.abc import Mapping
-from functools import partial
 from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import (
-    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -132,46 +130,15 @@ def _create_llm_answer_type_for_question(
         if llm_answer_mode == "discrete":
             return Literal.__getitem__(tuple(answers))
 
-    probability_record_model = create_model(
-        f"ProbabilityRecord{index}",
+    probability_fields = {
+        f"probability_{answer_index}": (Probability, Field(alias=answer))
+        for answer_index, answer in enumerate(answers)
+    }
+    return create_model(
+        f"ProbabilityMap{index}",
         __config__=ConfigDict(extra="forbid"),
-        label=(Literal.__getitem__(tuple(answers)), ...),
-        probability=(Probability, ...),
+        **probability_fields,
     )
-    return Annotated[
-        list[probability_record_model],
-        Field(min_length=len(answers), max_length=len(answers)),
-        AfterValidator(
-            partial(
-                _validate_probability_records_contain_every_label_once,
-                expected_labels=tuple(answers),
-            )
-        ),
-    ]
-
-
-def _validate_probability_records_contain_every_label_once(
-    probability_records: list[BaseModel],
-    expected_labels: tuple[str, ...],
-) -> list[BaseModel]:
-    """Require exactly one probability record for every allowed label.
-
-    The JSON schema constrains labels to the expected enum and fixes the record count.
-    This validator supplies the remaining uniqueness constraint without expanding the
-    provider grammar into one schema definition per label.
-
-    :param probability_records: Validated tagged probability records.
-    :param expected_labels: Complete allowed label collection.
-    :return: Unchanged probability records.
-    """
-    labels = [
-        str(probability_record.label) for probability_record in probability_records
-    ]
-    if len(labels) != len(set(labels)):
-        raise ValueError("Probability record labels must be unique")
-    if set(labels) != set(expected_labels):
-        raise ValueError("Probability records must contain every allowed label")
-    return probability_records
 
 
 def _build_llm_output_field_description(
@@ -187,13 +154,13 @@ def _build_llm_output_field_description(
         )
     elif isinstance(question, ScoreQuestion) and llm_answer_mode == "probabilities":
         description = (
-            "Each tagged record identifies a rubric level and the probability that "
-            f"the document matches it.\nQuestion: {description}"
+            "Each property maps a rubric level to the probability that the document "
+            f"matches it.\nQuestion: {description}"
         )
     elif isinstance(question, ChoiceQuestion) and llm_answer_mode == "probabilities":
         description = (
-            "Each tagged record identifies an option and the probability that it is "
-            "the best answer.\n"
+            "Each property maps an option to the probability that it is the best "
+            "answer.\n"
             f"Question: {description}"
         )
 
@@ -204,7 +171,7 @@ def _build_llm_output_field_description(
         )
         if llm_answer_mode == "discrete":
             return f"{description}\nScore levels, answer with the integer:\n{levels}"
-        return f"{description}\nRequired probability record labels:\n{levels}"
+        return f"{description}\nRequired probability keys:\n{levels}"
 
     if isinstance(question, ChoiceQuestion):
         choices = "\n".join(
@@ -213,7 +180,7 @@ def _build_llm_output_field_description(
         )
         if llm_answer_mode == "discrete":
             return f"{description}\nChoice labels, answer with one label:\n{choices}"
-        return f"{description}\nRequired probability record labels:\n{choices}"
+        return f"{description}\nRequired probability keys:\n{choices}"
 
     if not isinstance(question, NoulQuestion) or question.criteria is None:
         return description

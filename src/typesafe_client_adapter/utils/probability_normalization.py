@@ -92,20 +92,8 @@ def normalize_probabilities_of_all_answers(
         probabilities = {answer: float(answer == selected) for answer in answers}
         return ProbabilityNormalization(probabilities)
 
-    if isinstance(value, Mapping):
-        answer_probabilities = ((answer, value[answer]) for answer in answers)
-    elif value and isinstance(value[0], Mapping):
-        tagged_probabilities = {
-            str(probability_record["label"]): probability_record["probability"]
-            for probability_record in value
-        }
-        answer_probabilities = (
-            (answer, tagged_probabilities[answer]) for answer in answers
-        )
-    else:
-        answer_probabilities = zip(answers, value, strict=True)
     original_probabilities = {
-        answer: float(probability) for answer, probability in answer_probabilities
+        answer: float(value[answer]) for answer in answers
     }
     total = sum(original_probabilities.values())
     error = abs(total - 1.0)
