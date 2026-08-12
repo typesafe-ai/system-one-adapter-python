@@ -65,11 +65,9 @@ _PROBABILITY_SYSTEM_PROMPT = (
     _BASE_SYSTEM_PROMPT
     + """
 For Noul questions, return the probability that the answer is yes or the assertion is
-true. For Choice and Score questions, return one tagged record per allowed label. Each
-record must contain its label and probability. Preserve genuine uncertainty. Use a
-one-hot distribution only when the document rules out every alternative. Include every
-allowed label exactly once, keep each probability between 0 and 1, and make the
-probabilities sum to 1."""
+true. For Choice and Score questions, return an object mapping every allowed label to
+its probability. Preserve genuine uncertainty. Include every allowed label, do not add
+labels, keep each probability between 0 and 1, and make the probabilities sum to 1."""
 )
 _DISCRETE_SYSTEM_PROMPT = (
     _BASE_SYSTEM_PROMPT

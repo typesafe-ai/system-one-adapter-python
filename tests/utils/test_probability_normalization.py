@@ -1,7 +1,6 @@
 """Probability normalization tests."""
 
 import pytest
-from pytest import param
 
 from typesafe_client_adapter.utils.probability_normalization import (
     normalize_probabilities_of_all_answers,
@@ -9,14 +8,6 @@ from typesafe_client_adapter.utils.probability_normalization import (
 )
 
 
-@pytest.mark.parametrize(
-    "probability_representation",
-    [
-        param("object", id="object"),
-        param("array", id="array"),
-        param("tagged-records", id="tagged-records"),
-    ],
-)
 @pytest.mark.parametrize(
     (
         "normalization_enabled",
@@ -50,7 +41,6 @@ from typesafe_client_adapter.utils.probability_normalization import (
     ],
 )
 def test_probability_normalization_and_debug_data(
-    probability_representation,
     normalization_enabled,
     raw_probability,
     expected_probability,
@@ -63,18 +53,6 @@ def test_probability_normalization_and_debug_data(
         "fiction": raw_probability,
         "nonfiction": raw_probability,
     }
-    if probability_representation == "array":
-        score_probabilities = list(score_probabilities.values())
-        choice_probabilities = list(choice_probabilities.values())
-    elif probability_representation == "tagged-records":
-        score_probabilities = [
-            {"label": label, "probability": probability}
-            for label, probability in reversed(score_probabilities.items())
-        ]
-        choice_probabilities = [
-            {"label": label, "probability": probability}
-            for label, probability in reversed(choice_probabilities.items())
-        ]
     probability_normalizations = {
         "positive": None,
         "stars": normalize_probabilities_of_all_answers(

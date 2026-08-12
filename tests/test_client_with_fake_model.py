@@ -296,19 +296,9 @@ def test_invalid_questions_are_rejected(questions):
         ),
         param(
             {"genre": QUESTIONS["genre"]},
-            {
-                "genre": [
-                    {"label": "fiction", "probability": 0.5},
-                    {"label": "fiction", "probability": 0.5},
-                ]
-            },
-            {
-                "genre": [
-                    {"label": "fiction", "probability": 0.5},
-                    {"label": "nonfiction", "probability": 0.5},
-                ]
-            },
-            id="duplicate-probability-label",
+            {"genre": {"fiction": 0.5}},
+            {"genre": {"fiction": 0.5, "nonfiction": 0.5}},
+            id="missing-probability-key",
         ),
     ],
 )
