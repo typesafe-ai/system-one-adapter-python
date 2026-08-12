@@ -171,6 +171,37 @@ class _EvaluationRun:
             )
         self._model_request_count_at_agent_run_start = self.run_usage.requests
 
+    def debug(self, error: Exception | None = None) -> dict[str, Any]:
+        """Build diagnostics for a successful response or terminal exception.
+
+        :param error: Terminal exception when the evaluation failed.
+        :return: Retry reasons, model attempts, and optional exception chain.
+        """
+        debug = {
+            **self.model_request_debug_data,
+            "retry_reasons": [
+                (retry_reason.category, retry_reason.msg)
+                for retry_reason in self.retry_reasons
+            ],
+        }
+        if error is None:
+            return debug
+
+        exception_chain = []
+        seen_exception_ids = set()
+        current_error: BaseException | None = error
+        while current_error is not None and id(current_error) not in seen_exception_ids:
+            seen_exception_ids.add(id(current_error))
+            exception_chain.append(
+                {
+                    "type": type(current_error).__name__,
+                    "message": str(current_error),
+                }
+            )
+            current_error = current_error.__cause__ or current_error.__context__
+        debug["exception_chain"] = exception_chain
+        return debug
+
     def response(self, output: BaseModel, n_retries: int) -> SystemOneResponse:
         """Build the response from a successful attempt.
 
@@ -213,11 +244,7 @@ class _EvaluationRun:
             ),
             debug={
                 **probability_debug_data(probability_normalizations),
-                **self.model_request_debug_data,
-                "retry_reasons": [
-                    (retry_reason.category, retry_reason.msg)
-                    for retry_reason in self.retry_reasons
-                ],
+                **self.debug(),
             },
         )
 
@@ -330,11 +357,15 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 usage=evaluation.run_usage,
             )
 
-        result, n_retries = run_with_retries(
-            run_pydantic_agent_attempt,
-            self.retry,
-            evaluation.retry_reasons,
-        )
+        try:
+            result, n_retries = run_with_retries(
+                run_pydantic_agent_attempt,
+                self.retry,
+                evaluation.retry_reasons,
+            )
+        except Exception as error:
+            error.debug = evaluation.debug(error)
+            raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
     async def system_one_async(
@@ -353,11 +384,15 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 usage=evaluation.run_usage,
             )
 
-        result, n_retries = await run_with_retries_async(
-            run_pydantic_agent_attempt_async,
-            self.retry,
-            evaluation.retry_reasons,
-        )
+        try:
+            result, n_retries = await run_with_retries_async(
+                run_pydantic_agent_attempt_async,
+                self.retry,
+                evaluation.retry_reasons,
+            )
+        except Exception as error:
+            error.debug = evaluation.debug(error)
+            raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
     def close(self) -> None:

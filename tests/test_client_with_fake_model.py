@@ -192,6 +192,56 @@ def test_retries_are_exhausted(async_call):
 
     assert calls == 3
     assert raised.value.status_code == 503
+    assert len(raised.value.debug["llm_attempts"]) == 3
+    assert [category for category, _ in raised.value.debug["retry_reasons"]] == [
+        "provider_error",
+        "provider_error",
+    ]
+    exception_types = [item["type"] for item in raised.value.debug["exception_chain"]]
+    assert exception_types[:2] == ["TypeSafeUnknownError", "ModelHTTPError"]
+
+
+@pytest.mark.parametrize("async_call", [False, True])
+def test_malformed_retry_exhaustion_preserves_debug(async_call):
+    """Terminal malformed-output errors retain attempts and validation reasons."""
+    calls = 0
+
+    def return_malformed_response(_messages, _agent_info):
+        nonlocal calls
+        calls += 1
+        return ModelResponse(
+            [TextPart(json.dumps({"answers": {}}))],
+            usage=RequestUsage(input_tokens=11, output_tokens=7),
+        )
+
+    model = FunctionModel(return_malformed_response, model_name="test-model")
+    client = TypeSafeClientAdapter(
+        structured_outputs=True,
+        llm_answer_mode="probabilities",
+        n_retry_malformed_structure=2,
+    )
+    questions = {"answer": QUESTIONS["positive"]}
+
+    with pytest.raises(TypeSafeUnknownError) as raised:
+        if async_call:
+            asyncio.run(client.system_one_async(model, "document", questions))
+        else:
+            client.system_one(model, "document", questions)
+
+    debug = raised.value.debug
+    assert calls == 3
+    assert len(debug["llm_attempts"]) == 3
+    assert [category for category, _ in debug["retry_reasons"]] == [
+        "malformed_structure",
+        "malformed_structure",
+    ]
+    assert all("validation error" in message for _, message in debug["retry_reasons"])
+    assert (
+        debug["llm_attempts"][-1]["llm_response"].parts[0].content == '{"answers": {}}'
+    )
+    exception_types = [item["type"] for item in debug["exception_chain"]]
+    assert exception_types[:2] == ["TypeSafeUnknownError", "UnexpectedModelBehavior"]
+    assert "ValidationError" in exception_types
 
 
 @pytest.mark.parametrize("async_call", [False, True])
