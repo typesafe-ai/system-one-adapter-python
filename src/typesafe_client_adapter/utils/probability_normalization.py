@@ -94,6 +94,14 @@ def normalize_probabilities_of_all_answers(
 
     if isinstance(value, Mapping):
         answer_probabilities = ((answer, value[answer]) for answer in answers)
+    elif value and isinstance(value[0], Mapping):
+        tagged_probabilities = {
+            str(probability_record["label"]): probability_record["probability"]
+            for probability_record in value
+        }
+        answer_probabilities = (
+            (answer, tagged_probabilities[answer]) for answer in answers
+        )
     else:
         answer_probabilities = zip(answers, value, strict=True)
     original_probabilities = {
