@@ -32,6 +32,39 @@ def test_client_is_typesafe_client():
     assert issubclass(TypeSafeClientAdapter, TypeSafeClient)
 
 
+def test_native_and_prompted_modes_send_identical_instructions():
+    captured_requests = {}
+
+    def capture_request(messages, agent_info):
+        """Capture provider-independent request fields for one output mode."""
+        parameters = agent_info.model_request_parameters
+        captured_requests[parameters.output_mode] = {
+            "instructions": [
+                instruction_part.content
+                for instruction_part in parameters.instruction_parts or []
+            ],
+            "prompted_output_instructions": parameters.prompted_output_instructions,
+        }
+        return ModelResponse([TextPart('{"answers":{"positive":true}}')])
+
+    function_model = FunctionModel(
+        capture_request,
+        profile={"supports_json_schema_output": True},
+    )
+    for structured_outputs in (False, True):
+        TypeSafeClientAdapter(
+            structured_outputs=structured_outputs,
+            llm_answer_mode="discrete",
+        ).system_one(
+            function_model,
+            "A delightful novel.",
+            {"positive": QUESTIONS["positive"]},
+        )
+
+    assert captured_requests["native"] == captured_requests["prompted"]
+    assert captured_requests["native"]["prompted_output_instructions"] is None
+
+
 def model_response(
     response_data,
     expected_output_mode,
@@ -54,19 +87,14 @@ def model_response(
             for instruction_part in parameters.instruction_parts or []
         ]
         if expected_system_prompt is not None:
-            assert instruction_contents[0] == expected_system_prompt
+            assert instruction_contents == [expected_system_prompt]
         for expected_instruction_fragment in expected_instruction_fragments:
             assert expected_instruction_fragment in "\n".join(instruction_contents)
         if expected_document_prompt is not None:
             assert messages[-1].parts[0].content == expected_document_prompt
         prompted_output_instructions = parameters.prompted_output_instructions
-        expected_prompted_output_instructions = (
-            "Return one JSON object that matches this schema exactly:\n\n"
-            f"{json.dumps(output_schema)}\n\n"
-            "Do not include text or Markdown fencing before or after the JSON object."
-        )
-        assert prompted_output_instructions == expected_prompted_output_instructions
-        assert instruction_contents[-1] == expected_prompted_output_instructions
+        assert parameters.prompted_output_template is False
+        assert prompted_output_instructions is None
         for expected_description in expected_descriptions:
             assert expected_description in json.dumps(output_schema)
         if not agent_info.output_tools:
@@ -143,9 +171,13 @@ probabilities sum to 1."""
 Return exactly one allowed value for each question."""
     expected_output_schema = json.loads(
         (
-            Path(__file__).with_name("expected_prompts")
-            / f"{answer_mode}-schema.json"
+            Path(__file__).with_name("expected_prompts") / f"{answer_mode}-schema.json"
         ).read_text()
+    )
+    expected_system_prompt += (
+        "\n\nReturn one JSON object that matches this schema exactly:\n\n"
+        f"{json.dumps(expected_output_schema, sort_keys=True)}\n\n"
+        "Do not include text or Markdown fencing before or after the JSON object."
     )
     expected_descriptions = (
         (
@@ -218,9 +250,9 @@ Return exactly one allowed value for each question."""
 
     llm_query = response.debug["llm_attempts"][0]
     llm_response = llm_query["llm_response"]
-    serialized_llm_attempt = response.model_dump(mode="json")["debug"][
-        "llm_attempts"
-    ][0]
+    serialized_llm_attempt = response.model_dump(mode="json")["debug"]["llm_attempts"][
+        0
+    ]
     serialized_query = json.dumps(serialized_llm_attempt)
     assert "Evaluate every question" in serialized_query
     assert "A delightful novel." in serialized_query
