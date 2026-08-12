@@ -1,0 +1,4 @@
+interface:
+  display_name: "Refresh Test Fixtures"
+  short_description: "Refresh prompt, response, and cassette fixtures"
+  default_prompt: "Use $refresh-test-fixtures to update test expected data after this change."

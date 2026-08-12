@@ -11,34 +11,40 @@ Complete responses, including serialized PydanticAI request contexts, live in
 ``tests/expected_responses``.
 Re-record after changing prompts, schemas, or providers::
 
-    uv run pytest tests/test_live_apis.py --record-mode=rewrite
+    uv run pytest tests/test_client_with_live_apis.py --record-mode=rewrite
 
 Recording makes real, billable API calls and needs ``OPENAI_API_KEY``,
 ``ANTHROPIC_API_KEY``, and ``TYPESAFE_API_KEY``.
 """
 
+import asyncio
 import json
 import os
 from pathlib import Path
 
 import pytest
 from pydantic_ai import ModelMessagesTypeAdapter
+from pytest import param
 from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
 from typesafe_client_adapter import TypeSafeClientAdapter
 
-DOCUMENT = "This book was a delight to read."
+DOCUMENT = (
+    "This is a positive review of a fiction book. "
+    "The reviewer gives the book exactly 5 out of 5 stars. "
+    "For the zero-based star rubric, this is label 4."
+)
 QUESTIONS = {
     "positive": NoulQuestion(instructions="The book review is positive."),
     "stars": ScoreQuestion(
-        instructions="Star rating for the book based on the review.",
+        instructions="The star rating explicitly given by the reviewer.",
         criteria=[
-            "Horrendous. Unreadable garbage.",
-            "Pretty bad, but theoretically readable.",
-            "Acceptable, but just barely.",
-            "Pretty good. Worth reading but not perfect.",
-            "Transcendent and impactful. A must read.",
+            "The reviewer gives 1 out of 5 stars.",
+            "The reviewer gives 2 out of 5 stars.",
+            "The reviewer gives 3 out of 5 stars.",
+            "The reviewer gives 4 out of 5 stars.",
+            "The reviewer gives 5 out of 5 stars.",
         ],
     ),
     "genre": ChoiceQuestion(
@@ -68,56 +74,20 @@ def _remove_generated_message_metadata(value):
     return value
 
 
-@pytest.mark.vcr
-@pytest.mark.parametrize(
-    ("client", "model"),
-    [
-        pytest.param(
-            TypeSafeClientAdapter(
-                structured_outputs=False,
-                llm_answer_mode="probabilities",
-            ),
-            "gpt-4o-mini",
-            id="openai-probabilities",
-        ),
-        pytest.param(
-            TypeSafeClientAdapter(
-                structured_outputs=False,
-                llm_answer_mode="discrete",
-            ),
-            "gpt-4o-mini",
-            id="openai-discrete",
-        ),
-        pytest.param(
-            TypeSafeClientAdapter(
-                structured_outputs=False,
-                llm_answer_mode="probabilities",
-            ),
-            "claude-haiku-4-5",
-            id="anthropic-probabilities",
-        ),
-        pytest.param(
-            TypeSafeClientAdapter(
-                structured_outputs=False,
-                llm_answer_mode="discrete",
-            ),
-            "claude-haiku-4-5",
-            id="anthropic-discrete",
-        ),
-        pytest.param(
-            TypeSafeClient(api_key=os.environ["TYPESAFE_API_KEY"]),
-            "speed_latest",
-            id="typesafe",
-        ),
-    ],
-)
-def test_live_responses_match_reference_shape(
-    client,
-    model,
-    request,
-):
-    response = client.system_one(model, DOCUMENT, QUESTIONS)
+def assert_live_response_matches_reference(response, request):
+    """Validate expected answers, stable response data, and debug messages.
+
+    :param response: Live or cassette-replayed TypeSafe response.
+    :param request: Pytest request identifying the matching expected response.
+    """
     response_data = response.model_dump(mode="json")
+    expected_answer_probabilities = {
+        "positive": response.answers["positive"].noul,
+        "stars": response.answers["stars"].probabilities["4"],
+        "genre": response.answers["genre"].probabilities["fiction"],
+    }
+    for question_id, probability in expected_answer_probabilities.items():
+        assert probability > 0.9, f"Low confidence for expected {question_id} answer"
 
     # Latency is wall-clock and so never reproducible; assert it is plausible and drop
     # it rather than pinning a recorded value that the next run cannot match.
@@ -129,11 +99,14 @@ def test_live_responses_match_reference_shape(
         Path(__file__).with_name("expected_responses")
         / f"{request.node.name}.json"
     )
-    expected_response_data = json.loads(expected_response_path.read_text())
-    assert _remove_generated_message_metadata(
-        response_data
-    ) == _remove_generated_message_metadata(expected_response_data)
-    if isinstance(client, TypeSafeClientAdapter):
+    if request.config.getoption("--record-mode") == "none":
+        expected_response_data = json.loads(expected_response_path.read_text())
+        assert _remove_generated_message_metadata(
+            response_data
+        ) == _remove_generated_message_metadata(expected_response_data)
+    else:
+        expected_response_path.write_text(json.dumps(response_data, indent=2) + "\n")
+    if "llm_attempts" in response_data.get("debug", {}):
         for llm_query in response_data["debug"]["llm_attempts"]:
             llm_response = llm_query["llm_response"]
             ModelMessagesTypeAdapter.validate_python(
@@ -142,3 +115,44 @@ def test_live_responses_match_reference_shape(
                     *([llm_response] if llm_response is not None else []),
                 ]
             )
+
+
+@pytest.mark.vcr
+@pytest.mark.parametrize(
+    "model",
+    [
+        param("gpt-4o-mini", id="openai"),
+        param("claude-haiku-4-5", id="anthropic"),
+    ],
+)
+@pytest.mark.parametrize(
+    "structured_outputs",
+    [param(False, id="prompted"), param(True, id="native")],
+)
+@pytest.mark.parametrize("answer_mode", ["probabilities", "discrete"])
+def test_live_responses_match_reference_shape(
+    model,
+    structured_outputs,
+    answer_mode,
+    request,
+):
+    client = TypeSafeClientAdapter(
+        structured_outputs=structured_outputs,
+        llm_answer_mode=answer_mode,
+    )
+    if structured_outputs:
+        response = asyncio.run(
+            client.system_one_async(model, DOCUMENT, QUESTIONS)
+        )
+    else:
+        response = client.system_one(model, DOCUMENT, QUESTIONS)
+    assert_live_response_matches_reference(response, request)
+
+
+@pytest.mark.vcr
+def test_live_typesafe_response_matches_reference_shape(request):
+    client = TypeSafeClient(api_key=os.environ["TYPESAFE_API_KEY"])
+
+    response = client.system_one("speed_latest", DOCUMENT, QUESTIONS)
+
+    assert_live_response_matches_reference(response, request)

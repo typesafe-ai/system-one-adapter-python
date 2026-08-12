@@ -2,14 +2,13 @@
 
 import asyncio
 import json
-from pathlib import Path
 
 import pytest
-from pydantic_ai import ModelMessagesTypeAdapter
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
+from pytest import param
 from typesafe_client import RetryConfig
 from typesafe_client.api.api_client import (
     TypeSafeUnknownError,
@@ -18,6 +17,7 @@ from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuesti
 
 from typesafe_client_adapter import TypeSafeClientAdapter
 
+DOCUMENT = "This is a delightful fiction novel."
 QUESTIONS = {
     "positive": NoulQuestion(instructions="The review is positive."),
     "stars": ScoreQuestion(instructions="Rating.", criteria=["Bad.", "Good."]),
@@ -71,7 +71,7 @@ def test_native_and_prompted_outputs_use_identical_system_and_user_messages(
             llm_answer_mode=answer_mode,
         ).system_one(
             model,
-            "A delightful novel.",
+            DOCUMENT,
             {"positive": QUESTIONS["positive"]},
         )
         llm_query = response.debug["llm_attempts"][0]
@@ -85,132 +85,6 @@ def test_native_and_prompted_outputs_use_identical_system_and_user_messages(
         )
 
     assert messages_by_output_mode["native"] == messages_by_output_mode["prompted"]
-
-
-@pytest.mark.parametrize("structured_outputs", [False, True])
-@pytest.mark.parametrize("async_call", [False, True])
-@pytest.mark.parametrize(
-    ("answer_mode", "response_data"),
-    [
-        (
-            "probabilities",
-            {
-                "answers": {
-                    "positive": 0.8,
-                    "stars": [
-                        {"label": "1", "probability": 0.9},
-                        {"label": "0", "probability": 0.1},
-                    ],
-                    "genre": [
-                        {"label": "nonfiction", "probability": 0.5},
-                        {"label": "fiction", "probability": 0.5},
-                    ],
-                }
-            },
-        ),
-        (
-            "discrete",
-            {"answers": {"positive": True, "stars": 1, "genre": "fiction"}},
-        ),
-    ],
-)
-def test_system_one(
-    answer_mode,
-    response_data,
-    async_call,
-    structured_outputs,
-):
-    client = TypeSafeClientAdapter(
-        structured_outputs=structured_outputs,
-        llm_answer_mode=answer_mode,
-    )
-    expected_output_mode = "native" if structured_outputs else "prompted"
-    expected_output_schema = json.loads(
-        (
-            Path(__file__).with_name("expected_prompts") / f"{answer_mode}-schema.json"
-        ).read_text()
-    )
-    model = create_model_returning_response(response_data)
-
-    if async_call:
-        response = asyncio.run(
-            client.system_one_async(model, "A delightful novel.", QUESTIONS)
-        )
-    else:
-        response = client.system_one(model, "A delightful novel.", QUESTIONS)
-
-    assert response.model == "test-model"
-    assert response.answers["positive"].type == "noul"
-    assert response.answers["positive"].noul == pytest.approx(
-        0.8 if answer_mode == "probabilities" else 1.0
-    )
-    assert response.answers["stars"].score == pytest.approx(
-        0.9 if answer_mode == "probabilities" else 1.0
-    )
-    assert response.answers["stars"].confidence == pytest.approx(
-        0.8 if answer_mode == "probabilities" else 1.0
-    )
-    assert response.answers["genre"].choice == "fiction"
-    assert response.answers["genre"].confidence == pytest.approx(
-        0.0 if answer_mode == "probabilities" else 1.0
-    )
-    assert response.answers["stars"].probabilities == pytest.approx(
-        {"0": 0.1, "1": 0.9} if answer_mode == "probabilities" else {"0": 0.0, "1": 1.0}
-    )
-    assert response.usage.input_tokens == 11
-    assert response.usage.output_tokens == 7
-    assert response.usage.n_retries == 0
-    assert response.usage.n_retries_malformed_structure == 0
-    assert response.usage.latency >= 0
-    assert not hasattr(response.usage, "max_error")
-    assert not hasattr(response.usage, "invalid_probs")
-    assert not hasattr(response.usage, "probability_errors")
-    assert response.debug["max_error"] == 0
-    assert response.debug["invalid_probs"] == 0
-    assert response.debug["probability_errors"] == {}
-    assert response.debug["retry_reasons"] == []
-
-    llm_query = response.debug["llm_attempts"][0]
-    llm_response = llm_query["llm_response"]
-    model_request_parameters = llm_query["model_request_parameters"]
-    output_schema = model_request_parameters.output_object.json_schema
-    assert model_request_parameters.output_mode == expected_output_mode
-    assert output_schema == expected_output_schema
-    assert llm_query["messages"][-1].parts[0].content == (
-        '<document>\n"A delightful novel."\n</document>'
-    )
-    assert model_request_parameters.prompted_output_template is False
-    assert model_request_parameters.prompted_output_instructions is None
-
-    serialized_llm_attempt = response.model_dump(mode="json")["debug"][
-        "llm_attempts"
-    ][0]
-    serialized_query = json.dumps(serialized_llm_attempt)
-    assert "Evaluate every question" in serialized_query
-    assert "A delightful novel." in serialized_query
-    assert llm_query["messages"][-1].kind == "request"
-    serialized_model_request_parameters = serialized_llm_attempt[
-        "model_request_parameters"
-    ]
-    assert serialized_model_request_parameters["output_mode"] == expected_output_mode
-    assert "positive" in json.dumps(
-        serialized_model_request_parameters["output_object"]
-    )
-    assert isinstance(llm_response, ModelResponse)
-    restored_messages = ModelMessagesTypeAdapter.validate_python(
-        [*serialized_llm_attempt["messages"], serialized_llm_attempt["llm_response"]]
-    )
-    assert len(restored_messages) == 2
-    assert llm_query["debug_info"]["model_name"] == "test-model"
-
-    replayed_response = asyncio.run(
-        model.request(
-            llm_query["messages"],
-            llm_query["model_settings"],
-            llm_query["model_request_parameters"],
-        )
-    )
-    assert replayed_response.parts == restored_messages[-1].parts
 
 
 def test_structured_document_prompt_is_delimited_and_escapes_embedded_tags():
@@ -369,20 +243,20 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
 @pytest.mark.parametrize(
     "questions",
     [
-        pytest.param({}, id="no-questions"),
-        pytest.param(
+        param({}, id="no-questions"),
+        param(
             {"stars": ScoreQuestion(instructions="Rating.", criteria=[])},
             id="empty-score-criteria",
         ),
-        pytest.param(
+        param(
             {"stars": ScoreQuestion(instructions="Rating.", criteria=["Good."])},
             id="single-score-criterion",
         ),
-        pytest.param(
+        param(
             {"genre": ChoiceQuestion(instructions="Genre.", criteria={})},
             id="empty-choice-criteria",
         ),
-        pytest.param(
+        param(
             {
                 "genre": ChoiceQuestion(
                     instructions="Genre.",
@@ -406,13 +280,13 @@ def test_invalid_questions_are_rejected(questions):
 @pytest.mark.parametrize(
     ("questions", "malformed_answers", "valid_answers"),
     [
-        pytest.param(
+        param(
             {"answer": QUESTIONS["positive"]},
             {},
             {"answer": 0.75},
             id="missing-answer",
         ),
-        pytest.param(
+        param(
             {"genre": QUESTIONS["genre"]},
             {
                 "genre": [
