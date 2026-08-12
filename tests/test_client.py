@@ -36,6 +36,7 @@ def model_response(
     response_data,
     expected_output_mode,
     expected_descriptions=(),
+    expected_instruction_fragments=(),
     expected_system_prompt=None,
     expected_document_prompt=None,
     expected_output_schema=None,
@@ -54,20 +55,18 @@ def model_response(
         ]
         if expected_system_prompt is not None:
             assert instruction_contents[0] == expected_system_prompt
+        for expected_instruction_fragment in expected_instruction_fragments:
+            assert expected_instruction_fragment in "\n".join(instruction_contents)
         if expected_document_prompt is not None:
             assert messages[-1].parts[0].content == expected_document_prompt
         prompted_output_instructions = parameters.prompted_output_instructions
-        if expected_output_mode == "prompted":
-            expected_prompted_output_instructions = (
-                "Return one JSON object that matches this schema exactly:\n\n"
-                f"{json.dumps(output_schema)}\n\n"
-                "Do not include text or Markdown fencing before or after the JSON "
-                "object."
-            )
-            assert prompted_output_instructions == expected_prompted_output_instructions
-            assert instruction_contents[-1] == expected_prompted_output_instructions
-        else:
-            assert prompted_output_instructions is None
+        expected_prompted_output_instructions = (
+            "Return one JSON object that matches this schema exactly:\n\n"
+            f"{json.dumps(output_schema)}\n\n"
+            "Do not include text or Markdown fencing before or after the JSON object."
+        )
+        assert prompted_output_instructions == expected_prompted_output_instructions
+        assert instruction_contents[-1] == expected_prompted_output_instructions
         for expected_description in expected_descriptions:
             assert expected_description in json.dumps(output_schema)
         if not agent_info.output_tools:
@@ -188,6 +187,15 @@ Return exactly one allowed value for each question."""
         response_data,
         expected_output_mode,
         expected_descriptions,
+        (
+            "The review is positive.",
+            "Rating.",
+            "Bad.",
+            "Good.",
+            "Genre.",
+            "A story.",
+            "Facts.",
+        ),
         expected_system_prompt,
         '<document>\n"A delightful novel."\n</document>',
         expected_output_schema,

@@ -76,11 +76,11 @@ Score probability arrays must include one value per allowed answer, keep each va
 between 0 and 1, and sum to 1."""
 _DISCRETE_SYSTEM_PROMPT = _BASE_SYSTEM_PROMPT + """
 Return exactly one allowed value for each question."""
-_PROMPTED_OUTPUT_TEMPLATE = """Return one JSON object that matches this schema exactly:
-
-{schema}
-
-Do not include text or Markdown fencing before or after the JSON object."""
+_OUTPUT_SCHEMA_INSTRUCTION_TEMPLATE = (
+    "Return one JSON object that matches this schema exactly:\n\n"
+    "{schema}\n\n"
+    "Do not include text or Markdown fencing before or after the JSON object."
+)
 
 
 def _serialize_document_as_user_prompt(document: InstructionValue) -> str:
@@ -274,13 +274,13 @@ class TypeSafeClientAdapter(TypeSafeClient):
             self.llm_answer_mode,
             self.compact_probability_arrays,
         )
-        if self.structured_outputs:
-            requested_output: Any = NativeOutput(output_model)
-        else:
-            requested_output = PromptedOutput(
-                output_model,
-                template=_PROMPTED_OUTPUT_TEMPLATE,
-            )
+        output_wrapper_class = (
+            NativeOutput if self.structured_outputs else PromptedOutput
+        )
+        requested_output: Any = output_wrapper_class(
+            output_model,
+            template=_OUTPUT_SCHEMA_INSTRUCTION_TEMPLATE,
+        )
         if self.compact_probability_arrays:
             system_prompt = _COMPACT_PROBABILITY_SYSTEM_PROMPT
         elif self.llm_answer_mode == "probabilities":

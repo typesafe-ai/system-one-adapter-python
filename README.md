@@ -280,7 +280,7 @@ TypeSafeClientAdapter response:
             "strict": null
           },
           "output_tools": [],
-          "prompted_output_template": null,
+          "prompted_output_template": "Return one JSON object that matches this schema exactly:\n\n{schema}\n\nDo not include text or Markdown fencing before or after the JSON object.",
           "allow_text_output": true,
           "allow_image_output": false,
           "instruction_parts": [
@@ -374,10 +374,10 @@ Repeating a request does not guarantee identical nondeterministic model output.
   - probability and discrete answer modes use distinct system instructions
   - documents are JSON-serialized inside `<document>` tags; embedded tag characters are escaped and document instructions are never followed
   - probability schemas define Noul truth probability, Choice option probability, and Score rubric-level probability semantics
-  - prompted structured output uses a pinned template owned by this package rather than PydanticAI's mutable default
+  - prompted and native structured output use a pinned schema-instruction template owned by this package rather than PydanticAI's mutable default
 - Structured output transport
   - `structured_outputs=False` requests plain-text JSON and does not use provider-native structured outputs or output tools
-  - `structured_outputs=True` uses the provider's native structured-output mode
+  - `structured_outputs=True` uses the provider's native structured-output mode and also repeats the schema, including questions and criteria, in the model instructions
 - Answer mode
   - `llm_answer_mode="probabilities"` requests probability distributions
   - `compact_probability_arrays=True`
