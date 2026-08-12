@@ -32,7 +32,8 @@ from typesafe_client_adapter import TypeSafeClientAdapter
 
 DOCUMENT = (
     "This is a positive review of a fiction book. "
-    "The reviewer gives the book exactly 5 out of 5 stars."
+    "The reviewer gives the book exactly 5 out of 5 stars. "
+    "For the zero-based star rubric, this is label 4."
 )
 QUESTIONS = {
     "positive": NoulQuestion(instructions="The book review is positive."),
@@ -98,11 +99,14 @@ def assert_live_response_matches_reference(response, request):
         Path(__file__).with_name("expected_responses")
         / f"{request.node.name}.json"
     )
-    expected_response_data = json.loads(expected_response_path.read_text())
-    assert _remove_generated_message_metadata(
-        response_data
-    ) == _remove_generated_message_metadata(expected_response_data)
-    if "llm_attempts" in response_data["debug"]:
+    if request.config.getoption("--record-mode") == "none":
+        expected_response_data = json.loads(expected_response_path.read_text())
+        assert _remove_generated_message_metadata(
+            response_data
+        ) == _remove_generated_message_metadata(expected_response_data)
+    else:
+        expected_response_path.write_text(json.dumps(response_data, indent=2) + "\n")
+    if "llm_attempts" in response_data.get("debug", {}):
         for llm_query in response_data["debug"]["llm_attempts"]:
             llm_response = llm_query["llm_response"]
             ModelMessagesTypeAdapter.validate_python(

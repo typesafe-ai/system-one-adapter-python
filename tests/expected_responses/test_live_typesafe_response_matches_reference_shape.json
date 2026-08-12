@@ -1,0 +1,41 @@
+{
+  "model": "speed_v10_mango_loco",
+  "answers": {
+    "positive": {
+      "type": "noul",
+      "noul": 0.99
+    },
+    "stars": {
+      "type": "score",
+      "score": 3.99,
+      "confidence": 0.99,
+      "probabilities": {
+        "0": 0.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0,
+        "4": 1.0
+      },
+      "legend": {
+        "0": "The reviewer gives 1 out of 5 stars.",
+        "1": "The reviewer gives 2 out of 5 stars.",
+        "2": "The reviewer gives 3 out of 5 stars.",
+        "3": "The reviewer gives 4 out of 5 stars.",
+        "4": "The reviewer gives 5 out of 5 stars."
+      }
+    },
+    "genre": {
+      "type": "choice",
+      "choice": "fiction",
+      "confidence": 1.0,
+      "probabilities": {
+        "fiction": 1.0,
+        "nonfiction": 0.0
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 437,
+    "output_tokens": 55
+  }
+}
