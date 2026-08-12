@@ -275,7 +275,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
         )
         requested_output: Any = output_wrapper_class(
             output_model,
-            template=False,
+            template=False,  # None adds no schema prompt for OpenAI or Anthropic.
         )
         if self.llm_answer_mode == "probabilities":
             system_prompt = _PROBABILITY_SYSTEM_PROMPT
