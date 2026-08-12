@@ -1,19 +1,12 @@
 """Pydantic and PydanticAI model construction."""
 
 import json
+import textwrap
 from collections.abc import Mapping
 from functools import partial
 from typing import Annotated, Any, Literal, TypeAlias
 
-from pydantic import (
-    AfterValidator,
-    BaseModel,
-    ConfigDict,
-    Field,
-    TypeAdapter,
-    create_model,
-)
-from pydantic_ai.tools import GenerateToolJsonSchema
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, create_model
 from typesafe_client.api.models import (
     ChoiceQuestion,
     NoulQuestion,
@@ -104,15 +97,73 @@ def create_llm_output_model(
     )
 
 
-def create_raw_output_schema(output_model: type[BaseModel]) -> dict[str, Any]:
-    """Create the raw output schema used by PydanticAI.
+def create_human_readable_output_schema(
+    questions: Mapping[str, Question],
+    llm_answer_mode: AnswerMode,
+) -> str:
+    """Describe the required model output without embedding raw JSON Schema.
 
-    :param output_model: Dynamic model returned by :func:`create_llm_output_model`.
-    :return: JSON schema before provider-specific transformations.
+    :param questions: Prepared questions.
+    :param llm_answer_mode: Probability or discrete answer mode.
+    :return: Human-readable output schema for model instructions.
     """
-    return TypeAdapter(output_model).json_schema(
-        schema_generator=GenerateToolJsonSchema,
+    lines = [
+        "Output schema:",
+        '- Root: JSON object with exactly one property, "answers".',
+        '- "answers": JSON object with exactly these properties:',
+    ]
+    for question_id, question in questions.items():
+        serialized_question_id = json.dumps(question_id, ensure_ascii=False)
+        if isinstance(question, NoulQuestion):
+            value_schema = (
+                "boolean"
+                if llm_answer_mode == "discrete"
+                else "number from 0 through 1"
+            )
+        elif llm_answer_mode == "discrete":
+            if isinstance(question, ScoreQuestion):
+                value_schema = f"integer from 0 through {len(question.criteria) - 1}"
+            else:
+                allowed_values = ", ".join(
+                    json.dumps(value, ensure_ascii=False) for value in question.criteria
+                )
+                value_schema = f"string, one of: {allowed_values}"
+        else:
+            value_schema = (
+                f"array of exactly {len(question.criteria)} records, one for each "
+                'required label. Each record has a "label" and a numeric '
+                '"probability" from 0 through 1'
+            )
+
+        lines.extend(
+            textwrap.wrap(
+                f"  - {serialized_question_id}: {value_schema}.",
+                width=88,
+                subsequent_indent="    ",
+            )
+        )
+        description = _build_llm_output_field_description(
+            question,
+            llm_answer_mode,
+        )
+        for description_line in description.splitlines():
+            lines.extend(
+                textwrap.wrap(
+                    description_line,
+                    width=84,
+                    initial_indent="    ",
+                    subsequent_indent="    ",
+                )
+            )
+
+    lines.extend(
+        (
+            "- Do not add properties that are not listed above.",
+            "Return only the JSON object, without Markdown fencing or surrounding "
+            "text.",
+        )
     )
+    return "\n".join(lines)
 
 
 def _create_llm_answer_type_for_question(

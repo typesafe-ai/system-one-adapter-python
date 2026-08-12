@@ -1,0 +1,17 @@
+Output schema:
+- Root: JSON object with exactly one property, "answers".
+- "answers": JSON object with exactly these properties:
+  - "positive": boolean.
+    The review is positive.
+  - "stars": integer from 0 through 1.
+    Rating.
+    Score levels, answer with the integer:
+    0 = Bad.
+    1 = Good.
+  - "genre": string, one of: "fiction", "nonfiction".
+    Genre.
+    Choice labels, answer with one label:
+    fiction = A story.
+    nonfiction = Facts.
+- Do not add properties that are not listed above.
+Return only the JSON object, without Markdown fencing or surrounding text.

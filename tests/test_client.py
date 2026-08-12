@@ -169,15 +169,19 @@ probabilities sum to 1."""
     else:
         expected_system_prompt += """
 Return exactly one allowed value for each question."""
+    expected_system_prompt += (
+        "\n\n"
+        + (
+            Path(__file__).with_name("expected_prompts")
+            / f"{answer_mode}-instructions.txt"
+        )
+        .read_text()
+        .rstrip()
+    )
     expected_output_schema = json.loads(
         (
             Path(__file__).with_name("expected_prompts") / f"{answer_mode}-schema.json"
         ).read_text()
-    )
-    expected_system_prompt += (
-        "\n\nReturn one JSON object that matches this schema exactly:\n\n"
-        f"{json.dumps(expected_output_schema, sort_keys=True)}\n\n"
-        "Do not include text or Markdown fencing before or after the JSON object."
     )
     expected_descriptions = (
         (

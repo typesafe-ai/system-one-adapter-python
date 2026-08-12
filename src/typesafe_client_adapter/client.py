@@ -51,8 +51,8 @@ from typesafe_client_adapter.utils.probability_normalization import (
 from typesafe_client_adapter.utils.pydantic_utils import (
     Question,
     convert_question_collection_to_validated_api_question_models,
+    create_human_readable_output_schema,
     create_llm_output_model,
-    create_raw_output_schema,
 )
 
 Answer = NoulAnswer | ScoreAnswer | ChoiceAnswer
@@ -75,11 +75,6 @@ _DISCRETE_SYSTEM_PROMPT = (
     _BASE_SYSTEM_PROMPT
     + """
 Return exactly one allowed value for each question."""
-)
-_OUTPUT_SCHEMA_INSTRUCTION_TEMPLATE = (
-    "Return one JSON object that matches this schema exactly:\n\n"
-    "{schema}\n\n"
-    "Do not include text or Markdown fencing before or after the JSON object."
 )
 
 
@@ -281,12 +276,9 @@ class TypeSafeClientAdapter(TypeSafeClient):
             system_prompt = _PROBABILITY_SYSTEM_PROMPT
         else:
             system_prompt = _DISCRETE_SYSTEM_PROMPT
-        system_prompt += "\n\n" + _OUTPUT_SCHEMA_INSTRUCTION_TEMPLATE.format(
-            schema=json.dumps(
-                create_raw_output_schema(output_model),
-                ensure_ascii=False,
-                sort_keys=True,
-            )
+        system_prompt += "\n\n" + create_human_readable_output_schema(
+            prepared_questions,
+            self.llm_answer_mode,
         )
         pydantic_model: str | Model = model
         if isinstance(model, str) and ":" not in model:

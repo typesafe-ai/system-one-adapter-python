@@ -1,0 +1,25 @@
+Output schema:
+- Root: JSON object with exactly one property, "answers".
+- "answers": JSON object with exactly these properties:
+  - "positive": number from 0 through 1.
+    Probability that the answer is yes or the assertion is true. 0 means no or
+    false, 0.5 means uncertain, and 1 means yes or true.
+    Question: The review is positive.
+  - "stars": array of exactly 2 records, one for each required label. Each record has a
+    "label" and a numeric "probability" from 0 through 1.
+    Each tagged record identifies a rubric level and the probability that the
+    document matches it.
+    Question: Rating.
+    Required probability record labels:
+    0 = Bad.
+    1 = Good.
+  - "genre": array of exactly 2 records, one for each required label. Each record has a
+    "label" and a numeric "probability" from 0 through 1.
+    Each tagged record identifies an option and the probability that it is the best
+    answer.
+    Question: Genre.
+    Required probability record labels:
+    fiction = A story.
+    nonfiction = Facts.
+- Do not add properties that are not listed above.
+Return only the JSON object, without Markdown fencing or surrounding text.
