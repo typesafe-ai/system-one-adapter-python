@@ -5,7 +5,7 @@
             "request": {
                 "method": "POST",
                 "uri": "https://api.typesafe.ai/v1/systemone",
-                "body": "{\"document\":\"This is a positive review of a fiction book. The reviewer gives the book exactly 5 out of 5 stars. For the zero-based star rubric, this is label 4.\",\"model\":\"speed_latest\",\"questions\":{\"positive\":{\"type\":\"noul\",\"instructions\":\"The book review is positive.\",\"criteria\":null},\"stars\":{\"type\":\"score\",\"instructions\":\"The star rating explicitly given by the reviewer.\",\"criteria\":[\"The reviewer gives 1 out of 5 stars.\",\"The reviewer gives 2 out of 5 stars.\",\"The reviewer gives 3 out of 5 stars.\",\"The reviewer gives 4 out of 5 stars.\",\"The reviewer gives 5 out of 5 stars.\"]},\"genre\":{\"type\":\"choice\",\"instructions\":\"Which genre this review is about.\",\"criteria\":{\"fiction\":\"A novel or short story.\",\"nonfiction\":\"A book based on facts, real events, or ideas.\"}}}}",
+                "body": "{\"document\":\"The reviewer calls this entirely invented novel about dragons and wizards a flawless masterpiece and the best book they have ever read. They say it has no weaknesses, offer only unreserved praise, and urge everyone to read it.\",\"model\":\"speed_latest\",\"questions\":{\"positive\":{\"type\":\"noul\",\"instructions\":\"The book review is positive.\",\"criteria\":null},\"rating\":{\"type\":\"score\",\"instructions\":\"How favorable the reviewer's overall assessment is.\",\"criteria\":[\"The reviewer condemns the book and urges readers to avoid it.\",\"The reviewer is mostly critical and does not recommend the book.\",\"The reviewer expresses mixed or neutral feelings about the book.\",\"The reviewer praises the book overall while noting meaningful flaws.\",\"The reviewer offers unreserved praise and an emphatic recommendation.\"]},\"genre\":{\"type\":\"choice\",\"instructions\":\"Which genre this review is about.\",\"criteria\":{\"fiction\":\"A novel or short story.\",\"nonfiction\":\"A book based on facts, real events, or ideas.\"}}}}",
                 "headers": {
                     "host": [
                         "api.typesafe.ai"
@@ -23,7 +23,7 @@
                         "python-httpx/0.28.1"
                     ],
                     "content-length": [
-                        "775"
+                        "1003"
                     ],
                     "content-type": [
                         "application/json"
@@ -41,7 +41,7 @@
                     ]
                 },
                 "body": {
-                    "string": "{\"model\":\"speed_v10_mango_loco\",\"answers\":{\"positive\":{\"type\":\"noul\",\"noul\":0.99},\"stars\":{\"type\":\"score\",\"score\":3.99,\"confidence\":0.99,\"legend\":{\"0\":\"The reviewer gives 1 out of 5 stars.\",\"1\":\"The reviewer gives 2 out of 5 stars.\",\"2\":\"The reviewer gives 3 out of 5 stars.\",\"3\":\"The reviewer gives 4 out of 5 stars.\",\"4\":\"The reviewer gives 5 out of 5 stars.\"},\"probabilities\":{\"0\":0.0,\"1\":0.0,\"2\":0.0,\"3\":0.0,\"4\":1.0}},\"genre\":{\"type\":\"choice\",\"choice\":\"fiction\",\"confidence\":1.0,\"probabilities\":{\"fiction\":1.0,\"nonfiction\":0.0}}},\"usage\":{\"input_tokens\":437,\"output_tokens\":55}}"
+                    "string": "{\"model\":\"speed_v10_mango_loco\",\"answers\":{\"positive\":{\"type\":\"noul\",\"noul\":1.0},\"rating\":{\"type\":\"score\",\"score\":4.0,\"confidence\":1.0,\"legend\":{\"0\":\"The reviewer condemns the book and urges readers to avoid it.\",\"1\":\"The reviewer is mostly critical and does not recommend the book.\",\"2\":\"The reviewer expresses mixed or neutral feelings about the book.\",\"3\":\"The reviewer praises the book overall while noting meaningful flaws.\",\"4\":\"The reviewer offers unreserved praise and an emphatic recommendation.\"},\"probabilities\":{\"0\":0.0,\"1\":0.0,\"2\":0.0,\"3\":0.0,\"4\":1.0}},\"genre\":{\"type\":\"choice\",\"choice\":\"fiction\",\"confidence\":1.0,\"probabilities\":{\"fiction\":1.0,\"nonfiction\":0.0}}},\"usage\":{\"input_tokens\":448,\"output_tokens\":55}}"
                 }
             }
         }

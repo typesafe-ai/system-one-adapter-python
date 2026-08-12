@@ -31,20 +31,20 @@ from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuesti
 from typesafe_client_adapter import TypeSafeClientAdapter
 
 DOCUMENT = (
-    "This is a positive review of a fiction book. "
-    "The reviewer gives the book exactly 5 out of 5 stars. "
-    "For the zero-based star rubric, this is label 4."
+    "The reviewer calls this entirely invented novel about dragons and wizards a "
+    "flawless masterpiece and the best book they have ever read. They say it has no "
+    "weaknesses, offer only unreserved praise, and urge everyone to read it."
 )
 QUESTIONS = {
     "positive": NoulQuestion(instructions="The book review is positive."),
-    "stars": ScoreQuestion(
-        instructions="The star rating explicitly given by the reviewer.",
+    "rating": ScoreQuestion(
+        instructions="How favorable the reviewer's overall assessment is.",
         criteria=[
-            "The reviewer gives 1 out of 5 stars.",
-            "The reviewer gives 2 out of 5 stars.",
-            "The reviewer gives 3 out of 5 stars.",
-            "The reviewer gives 4 out of 5 stars.",
-            "The reviewer gives 5 out of 5 stars.",
+            "The reviewer condemns the book and urges readers to avoid it.",
+            "The reviewer is mostly critical and does not recommend the book.",
+            "The reviewer expresses mixed or neutral feelings about the book.",
+            "The reviewer praises the book overall while noting meaningful flaws.",
+            "The reviewer offers unreserved praise and an emphatic recommendation.",
         ],
     ),
     "genre": ChoiceQuestion(
@@ -83,7 +83,7 @@ def assert_live_response_matches_reference(response, request):
     response_data = response.model_dump(mode="json")
     expected_answer_probabilities = {
         "positive": response.answers["positive"].noul,
-        "stars": response.answers["stars"].probabilities["4"],
+        "rating": response.answers["rating"].probabilities["4"],
         "genre": response.answers["genre"].probabilities["fiction"],
     }
     for question_id, probability in expected_answer_probabilities.items():
