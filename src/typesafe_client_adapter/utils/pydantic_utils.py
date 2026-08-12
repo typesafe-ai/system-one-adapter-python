@@ -2,9 +2,10 @@
 
 import json
 from collections.abc import Mapping
+from functools import partial
 from typing import Annotated, Any, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, create_model
 from typesafe_client.api.models import (
     ChoiceQuestion,
     NoulQuestion,
@@ -58,6 +59,7 @@ def create_llm_output_model(
     fields = {}
     for index, (question_id, question) in enumerate(questions.items()):
         answer_type = _create_llm_answer_type_for_question(
+            index,
             question,
             llm_answer_mode,
         )
@@ -95,6 +97,7 @@ def create_llm_output_model(
 
 
 def _create_llm_answer_type_for_question(
+    index: int,
     question: Question,
     llm_answer_mode: AnswerMode,
 ) -> Any:
@@ -110,10 +113,46 @@ def _create_llm_answer_type_for_question(
         if llm_answer_mode == "discrete":
             return Literal.__getitem__(tuple(answers))
 
+    probability_record_model = create_model(
+        f"ProbabilityRecord{index}",
+        __config__=ConfigDict(extra="forbid"),
+        label=(Literal.__getitem__(tuple(answers)), ...),
+        probability=(Probability, ...),
+    )
     return Annotated[
-        list[Probability],
+        list[probability_record_model],
         Field(min_length=len(answers), max_length=len(answers)),
+        AfterValidator(
+            partial(
+                _validate_probability_records_contain_every_label_once,
+                expected_labels=tuple(answers),
+            )
+        ),
     ]
+
+
+def _validate_probability_records_contain_every_label_once(
+    probability_records: list[BaseModel],
+    expected_labels: tuple[str, ...],
+) -> list[BaseModel]:
+    """Require exactly one probability record for every allowed label.
+
+    The JSON schema constrains labels to the expected enum and fixes the record count.
+    This validator supplies the remaining uniqueness constraint without expanding the
+    provider grammar into one schema definition per label.
+
+    :param probability_records: Validated tagged probability records.
+    :param expected_labels: Complete allowed label collection.
+    :return: Unchanged probability records.
+    """
+    labels = [
+        str(probability_record.label) for probability_record in probability_records
+    ]
+    if len(labels) != len(set(labels)):
+        raise ValueError("Probability record labels must be unique")
+    if set(labels) != set(expected_labels):
+        raise ValueError("Probability records must contain every allowed label")
+    return probability_records
 
 
 def _build_llm_output_field_description(
@@ -129,13 +168,13 @@ def _build_llm_output_field_description(
         )
     elif isinstance(question, ScoreQuestion) and llm_answer_mode == "probabilities":
         description = (
-            "Each array value is the probability that the document matches "
-            f"that rubric level.\nQuestion: {description}"
+            "Each tagged record identifies a rubric level and the probability that "
+            f"the document matches it.\nQuestion: {description}"
         )
     elif isinstance(question, ChoiceQuestion) and llm_answer_mode == "probabilities":
         description = (
-            "Each array value is the probability that its option is the best "
-            "answer.\n"
+            "Each tagged record identifies an option and the probability that it is "
+            "the best answer.\n"
             f"Question: {description}"
         )
 
@@ -146,7 +185,7 @@ def _build_llm_output_field_description(
         )
         if llm_answer_mode == "discrete":
             return f"{description}\nScore levels, answer with the integer:\n{levels}"
-        return f"{description}\nProbability array order:\n{levels}"
+        return f"{description}\nRequired probability record labels:\n{levels}"
 
     if isinstance(question, ChoiceQuestion):
         choices = "\n".join(
@@ -155,7 +194,7 @@ def _build_llm_output_field_description(
         )
         if llm_answer_mode == "discrete":
             return f"{description}\nChoice labels, answer with one label:\n{choices}"
-        return f"{description}\nProbability array order:\n{choices}"
+        return f"{description}\nRequired probability record labels:\n{choices}"
 
     if not isinstance(question, NoulQuestion) or question.criteria is None:
         return description

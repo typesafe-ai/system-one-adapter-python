@@ -1,5 +1,51 @@
 {
   "$defs": {
+    "ProbabilityRecord1": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "enum": [
+            "0",
+            "1"
+          ],
+          "type": "string"
+        },
+        "probability": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "probability"
+      ],
+      "title": "ProbabilityRecord1",
+      "type": "object"
+    },
+    "ProbabilityRecord2": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "enum": [
+            "fiction",
+            "nonfiction"
+          ],
+          "type": "string"
+        },
+        "probability": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "probability"
+      ],
+      "title": "ProbabilityRecord2",
+      "type": "object"
+    },
     "TypeSafeAnswers": {
       "additionalProperties": false,
       "properties": {
@@ -10,22 +56,18 @@
           "type": "number"
         },
         "stars": {
-          "description": "Each array value is the probability that the document matches that rubric level.\nQuestion: Rating.\nProbability array order:\n0 = Bad.\n1 = Good.",
+          "description": "Each tagged record identifies a rubric level and the probability that the document matches it.\nQuestion: Rating.\nRequired probability record labels:\n0 = Bad.\n1 = Good.",
           "items": {
-            "maximum": 1,
-            "minimum": 0,
-            "type": "number"
+            "$ref": "#/$defs/ProbabilityRecord1"
           },
           "maxItems": 2,
           "minItems": 2,
           "type": "array"
         },
         "genre": {
-          "description": "Each array value is the probability that its option is the best answer.\nQuestion: Genre.\nProbability array order:\nfiction = A story.\nnonfiction = Facts.",
+          "description": "Each tagged record identifies an option and the probability that it is the best answer.\nQuestion: Genre.\nRequired probability record labels:\nfiction = A story.\nnonfiction = Facts.",
           "items": {
-            "maximum": 1,
-            "minimum": 0,
-            "type": "number"
+            "$ref": "#/$defs/ProbabilityRecord2"
           },
           "maxItems": 2,
           "minItems": 2,

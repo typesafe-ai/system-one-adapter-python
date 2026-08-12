@@ -13,6 +13,7 @@ from typesafe_client_adapter.utils.probability_normalization import (
     [
         pytest.param("object", id="object"),
         pytest.param("array", id="array"),
+        pytest.param("tagged-records", id="tagged-records"),
     ],
 )
 @pytest.mark.parametrize(
@@ -64,6 +65,15 @@ def test_probability_normalization_and_debug_data(
     if probability_representation == "array":
         score_probabilities = list(score_probabilities.values())
         choice_probabilities = list(choice_probabilities.values())
+    elif probability_representation == "tagged-records":
+        score_probabilities = [
+            {"label": label, "probability": probability}
+            for label, probability in reversed(score_probabilities.items())
+        ]
+        choice_probabilities = [
+            {"label": label, "probability": probability}
+            for label, probability in reversed(choice_probabilities.items())
+        ]
     probability_normalizations = {
         "positive": None,
         "stars": normalize_probabilities_of_all_answers(

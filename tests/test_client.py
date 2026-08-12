@@ -95,8 +95,14 @@ def model_response(
             {
                 "answers": {
                     "positive": 0.8,
-                    "stars": [0.1, 0.9],
-                    "genre": [0.5, 0.5],
+                    "stars": [
+                        {"label": "1", "probability": 0.9},
+                        {"label": "0", "probability": 0.1},
+                    ],
+                    "genre": [
+                        {"label": "nonfiction", "probability": 0.5},
+                        {"label": "fiction", "probability": 0.5},
+                    ],
                 }
             },
         ),
@@ -127,12 +133,11 @@ def test_system_one(
     if answer_mode == "probabilities":
         expected_system_prompt += """
 For Noul questions, return the probability that the answer is yes or the assertion is
-true. For Choice questions, return an ordered array containing each option's probability
-of being the best answer. For Score questions, return an ordered array containing each
-rubric level's probability of matching the document. Preserve genuine uncertainty. Use
-a one-hot distribution only when the document rules out every alternative. Choice and
-Score probability arrays must include one value per allowed answer, keep each value
-between 0 and 1, and sum to 1."""
+true. For Choice and Score questions, return one tagged record per allowed label. Each
+record must contain its label and probability. Preserve genuine uncertainty. Use a
+one-hot distribution only when the document rules out every alternative. Include every
+allowed label exactly once, keep each probability between 0 and 1, and make the
+probabilities sum to 1."""
     else:
         expected_system_prompt += """
 Return exactly one allowed value for each question."""
@@ -150,8 +155,9 @@ Return exactly one allowed value for each question."""
         )
         if answer_mode == "discrete"
         else (
-            "Probability array order:\\n0 = Bad.\\n1 = Good.",
-            "Probability array order:\\nfiction = A story.\\nnonfiction = Facts.",
+            "Required probability record labels:\\n0 = Bad.\\n1 = Good.",
+            "Required probability record labels:\\nfiction = A story.\\n"
+            "nonfiction = Facts.",
         )
     )
     model = model_response(
@@ -420,13 +426,44 @@ def test_invalid_questions_are_rejected(questions):
         ).system_one(model, "document", questions)
 
 
-def test_malformed_structure_is_retried():
+@pytest.mark.parametrize(
+    ("questions", "malformed_answers", "valid_answers"),
+    [
+        pytest.param(
+            {"answer": QUESTIONS["positive"]},
+            {},
+            {"answer": 0.75},
+            id="missing-answer",
+        ),
+        pytest.param(
+            {"genre": QUESTIONS["genre"]},
+            {
+                "genre": [
+                    {"label": "fiction", "probability": 0.5},
+                    {"label": "fiction", "probability": 0.5},
+                ]
+            },
+            {
+                "genre": [
+                    {"label": "fiction", "probability": 0.5},
+                    {"label": "nonfiction", "probability": 0.5},
+                ]
+            },
+            id="duplicate-probability-label",
+        ),
+    ],
+)
+def test_malformed_structure_is_retried(
+    questions,
+    malformed_answers,
+    valid_answers,
+):
     calls = 0
 
     def return_malformed_then_valid_response(messages, agent_info):
         nonlocal calls
         calls += 1
-        answers = {} if calls == 1 else {"answer": 0.75}
+        answers = malformed_answers if calls == 1 else valid_answers
         return ModelResponse(
             [TextPart(json.dumps({"answers": answers}))],
             usage=RequestUsage(input_tokens=11, output_tokens=7),
@@ -443,7 +480,7 @@ def test_malformed_structure_is_retried():
     ).system_one(
         model,
         "document",
-        {"answer": QUESTIONS["positive"]},
+        questions,
     )
 
     assert calls == 2
