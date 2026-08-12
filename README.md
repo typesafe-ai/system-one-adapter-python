@@ -409,7 +409,7 @@ Repeating a request does not guarantee identical nondeterministic model output.
 - Tests make real LLM and TypeSafe API calls, recorded as HTTP cassettes so replay is deterministic (vcrpy via pytest-recording)
   - cassettes are JSON and live in `tests/cassettes`, next to the tests
   - replay is the default and needs no credentials or network; the whole client stack runs against recorded provider traffic
-  - re-record with `uv run pytest tests/test_live_apis.py --record-mode=rewrite`, which makes real billable calls and needs `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `TYPESAFE_API_KEY`
+  - re-record with `uv run pytest tests/test_client_with_live_apis.py --record-mode=rewrite`, which makes real billable calls and needs `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `TYPESAFE_API_KEY`
   - request/response credentials are stripped at record time (see `tests/conftest.py`); matching includes the request body because every call posts to the same endpoint
 - Exception handling tests use deterministic provider-shaped HTTP responses passed through the real provider SDK and PydanticAI adapter stacks
   - they do not guarantee future provider payload compatibility; revalidate them against live APIs after provider or SDK changes

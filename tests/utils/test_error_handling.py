@@ -10,6 +10,7 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.openai import OpenAIResponsesModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
+from pytest import param
 from typesafe_client import RetryConfig
 from typesafe_client.api.api_client import (
     TypeSafeApiError,
@@ -174,7 +175,7 @@ def mock_provider_model():
 @pytest.mark.parametrize(
     ("provider", "status_code", "error_body", "expected_error"),
     [
-        pytest.param(
+        param(
             "openai",
             400,
             {
@@ -188,7 +189,7 @@ def mock_provider_model():
             TypeSafeTokensExceededError,
             id="openai-chat-completions-code",
         ),
-        pytest.param(
+        param(
             "openai",
             400,
             # Responses API leaves ``code`` null, so only the message identifies it.
@@ -206,7 +207,7 @@ def mock_provider_model():
             TypeSafeTokensExceededError,
             id="openai-responses-no-code",
         ),
-        pytest.param(
+        param(
             "openai",
             413,
             {
@@ -220,7 +221,7 @@ def mock_provider_model():
             TypeSafeTokensExceededError,
             id="openai-request-too-large",
         ),
-        pytest.param(
+        param(
             "anthropic",
             400,
             {
@@ -234,7 +235,7 @@ def mock_provider_model():
             TypeSafeTokensExceededError,
             id="anthropic-prompt-too-long",
         ),
-        pytest.param(
+        param(
             "anthropic",
             400,
             {
@@ -251,7 +252,7 @@ def mock_provider_model():
             TypeSafeTokensExceededError,
             id="anthropic-max-tokens-exceed-limit",
         ),
-        pytest.param(
+        param(
             "anthropic",
             400,
             # Unparseable body: detection must fall back to the stringified error.
@@ -259,7 +260,7 @@ def mock_provider_model():
             TypeSafeTokensExceededError,
             id="non-json-body",
         ),
-        pytest.param(
+        param(
             "openai",
             400,
             # Generic field-length validation, raised for oversized tool names and
@@ -278,7 +279,7 @@ def mock_provider_model():
             TypeSafeUnknownError,
             id="openai-string-above-max-length",
         ),
-        pytest.param(
+        param(
             "openai",
             400,
             {

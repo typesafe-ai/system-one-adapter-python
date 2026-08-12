@@ -1,6 +1,7 @@
 """Probability normalization tests."""
 
 import pytest
+from pytest import param
 
 from typesafe_client_adapter.utils.probability_normalization import (
     normalize_probabilities_of_all_answers,
@@ -11,9 +12,9 @@ from typesafe_client_adapter.utils.probability_normalization import (
 @pytest.mark.parametrize(
     "probability_representation",
     [
-        pytest.param("object", id="object"),
-        pytest.param("array", id="array"),
-        pytest.param("tagged-records", id="tagged-records"),
+        param("object", id="object"),
+        param("array", id="array"),
+        param("tagged-records", id="tagged-records"),
     ],
 )
 @pytest.mark.parametrize(
