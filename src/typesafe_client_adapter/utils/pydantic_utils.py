@@ -5,7 +5,15 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Annotated, Any, Literal, TypeAlias
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, create_model
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    create_model,
+)
+from pydantic_ai.tools import GenerateToolJsonSchema
 from typesafe_client.api.models import (
     ChoiceQuestion,
     NoulQuestion,
@@ -93,6 +101,17 @@ def create_llm_output_model(
                 )
             ),
         ),
+    )
+
+
+def create_raw_output_schema(output_model: type[BaseModel]) -> dict[str, Any]:
+    """Create the raw output schema used by PydanticAI.
+
+    :param output_model: Dynamic model returned by :func:`create_llm_output_model`.
+    :return: JSON schema before provider-specific transformations.
+    """
+    return TypeAdapter(output_model).json_schema(
+        schema_generator=GenerateToolJsonSchema,
     )
 
 

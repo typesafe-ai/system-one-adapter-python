@@ -127,7 +127,7 @@ def test_live_responses_match_reference_shape(
 
     expected_response_path = (
         Path(__file__).with_name("expected_responses")
-        / f"{request.node.callspec.id}.json"
+        / f"{request.node.name}.json"
     )
     expected_response_data = json.loads(expected_response_path.read_text())
     assert _remove_generated_message_metadata(
