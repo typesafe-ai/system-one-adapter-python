@@ -281,13 +281,14 @@ class TypeSafeClientAdapter(TypeSafeClient):
             system_prompt = _PROBABILITY_SYSTEM_PROMPT
         else:
             system_prompt = _DISCRETE_SYSTEM_PROMPT
-        system_prompt += "\n\n" + _OUTPUT_SCHEMA_INSTRUCTION_TEMPLATE.format(
-            schema=json.dumps(
-                create_raw_output_schema(output_model),
-                ensure_ascii=False,
-                sort_keys=True,
+        if not self.structured_outputs:
+            system_prompt += "\n\n" + _OUTPUT_SCHEMA_INSTRUCTION_TEMPLATE.format(
+                schema=json.dumps(
+                    create_raw_output_schema(output_model),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
             )
-        )
         pydantic_model: str | Model = model
         if isinstance(model, str) and ":" not in model:
             if model.startswith(("gpt-", "chatgpt-", "o1", "o3", "o4")):

@@ -59,7 +59,7 @@ def create_model_returning_response(response_data):
         ("discrete", {"answers": {"positive": True}}),
     ],
 )
-def test_native_and_prompted_outputs_use_identical_system_and_user_messages(
+def test_native_output_omits_prompted_schema_instructions(
     answer_mode,
     response_data,
 ):
@@ -84,7 +84,15 @@ def test_native_and_prompted_outputs_use_identical_system_and_user_messages(
             llm_query["messages"][-1].parts[0].content,
         )
 
-    assert messages_by_output_mode["native"] == messages_by_output_mode["prompted"]
+    native_system_prompt, native_user_prompt = messages_by_output_mode["native"]
+    prompted_system_prompt, prompted_user_prompt = messages_by_output_mode["prompted"]
+    schema_instruction = "\n\nReturn one JSON object that matches this schema exactly:"
+
+    assert prompted_system_prompt[0].startswith(
+        native_system_prompt[0] + schema_instruction
+    )
+    assert schema_instruction not in native_system_prompt[0]
+    assert native_user_prompt == prompted_user_prompt
 
 
 def test_structured_document_prompt_is_delimited_and_escapes_embedded_tags():
