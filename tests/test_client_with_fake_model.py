@@ -4,7 +4,7 @@ import asyncio
 import json
 
 import pytest
-from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
@@ -197,8 +197,7 @@ def test_retries_are_exhausted(async_call):
         "provider_error",
         "provider_error",
     ]
-    exception_types = [item["type"] for item in raised.value.debug["exception_chain"]]
-    assert exception_types[:2] == ["TypeSafeUnknownError", "ModelHTTPError"]
+    assert isinstance(raised.value.__cause__, ModelHTTPError)
 
 
 @pytest.mark.parametrize("async_call", [False, True])
@@ -239,9 +238,7 @@ def test_malformed_retry_exhaustion_preserves_debug(async_call):
     assert (
         debug["llm_attempts"][-1]["llm_response"].parts[0].content == '{"answers": {}}'
     )
-    exception_types = [item["type"] for item in debug["exception_chain"]]
-    assert exception_types[:2] == ["TypeSafeUnknownError", "UnexpectedModelBehavior"]
-    assert "ValidationError" in exception_types
+    assert isinstance(raised.value.__cause__, UnexpectedModelBehavior)
 
 
 @pytest.mark.parametrize("async_call", [False, True])

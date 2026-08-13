@@ -13,6 +13,7 @@ from pydantic_ai import Agent, NativeOutput, PromptedOutput
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage
 from typesafe_client import RetryConfig, TypeSafeClient
+from typesafe_client.api.api_client import TypeSafeApiError
 from typesafe_client.api.models import (
     ChoiceAnswer,
     NoulAnswer,
@@ -171,39 +172,18 @@ class _EvaluationRun:
             )
         self._model_request_count_at_agent_run_start = self.run_usage.requests
 
-    def build_evaluation_debug_data(
-        self,
-        error: Exception | None = None,
-    ) -> dict[str, Any]:
+    def build_evaluation_debug_data(self) -> dict[str, Any]:
         """Build diagnostics for a successful response or terminal exception.
 
-        :param error: Terminal exception when the evaluation failed.
-        :return: Retry reasons, model attempts, and optional exception chain.
+        :return: Retry reasons and model attempts.
         """
-        debug = {
+        return {
             **self.model_request_debug_data,
             "retry_reasons": [
                 (retry_reason.category, retry_reason.msg)
                 for retry_reason in self.retry_reasons
             ],
         }
-        if error is None:
-            return debug
-
-        exception_chain = []
-        seen_exception_ids = set()
-        current_error: BaseException | None = error
-        while current_error is not None and id(current_error) not in seen_exception_ids:
-            seen_exception_ids.add(id(current_error))
-            exception_chain.append(
-                {
-                    "type": type(current_error).__name__,
-                    "message": str(current_error),
-                }
-            )
-            current_error = current_error.__cause__ or current_error.__context__
-        debug["exception_chain"] = exception_chain
-        return debug
 
     def response(self, output: BaseModel, n_retries: int) -> SystemOneResponse:
         """Build the response from a successful attempt.
@@ -366,8 +346,8 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 self.retry,
                 evaluation.retry_reasons,
             )
-        except Exception as error:
-            error.debug = evaluation.build_evaluation_debug_data(error)
+        except TypeSafeApiError as error:
+            error.debug = evaluation.build_evaluation_debug_data()
             raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
@@ -393,8 +373,8 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 self.retry,
                 evaluation.retry_reasons,
             )
-        except Exception as error:
-            error.debug = evaluation.build_evaluation_debug_data(error)
+        except TypeSafeApiError as error:
+            error.debug = evaluation.build_evaluation_debug_data()
             raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 

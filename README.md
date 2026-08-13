@@ -401,8 +401,7 @@ Repeating a request does not guarantee identical nondeterministic model output.
   - these fields describe the provider-independent PydanticAI request, not the provider's final HTTP body
   - serialized messages retain timestamps, run IDs, and conversation IDs for complete debugging context
   - terminal exceptions expose the same diagnostics on `.debug`
-    - `exception_chain` contains the translated exception and its provider or validation causes
-    - failed malformed-output calls therefore retain every raw response and corrective validation message
+    - failed malformed-output calls retain every raw response and corrective validation message
 - Probability normalization
   - `normalize_probabilities=False` preserves LLM probabilities and only reports errors
   - `normalize_probabilities=True` renormalizes score and choice distributions
