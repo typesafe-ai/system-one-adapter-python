@@ -171,7 +171,10 @@ class _EvaluationRun:
             )
         self._model_request_count_at_agent_run_start = self.run_usage.requests
 
-    def debug(self, error: Exception | None = None) -> dict[str, Any]:
+    def build_evaluation_debug_data(
+        self,
+        error: Exception | None = None,
+    ) -> dict[str, Any]:
         """Build diagnostics for a successful response or terminal exception.
 
         :param error: Terminal exception when the evaluation failed.
@@ -244,7 +247,7 @@ class _EvaluationRun:
             ),
             debug={
                 **probability_debug_data(probability_normalizations),
-                **self.debug(),
+                **self.build_evaluation_debug_data(),
             },
         )
 
@@ -364,7 +367,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 evaluation.retry_reasons,
             )
         except Exception as error:
-            error.debug = evaluation.debug(error)
+            error.debug = evaluation.build_evaluation_debug_data(error)
             raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
@@ -391,7 +394,7 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 evaluation.retry_reasons,
             )
         except Exception as error:
-            error.debug = evaluation.debug(error)
+            error.debug = evaluation.build_evaluation_debug_data(error)
             raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
