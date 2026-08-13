@@ -242,8 +242,8 @@ def test_malformed_retry_exhaustion_preserves_debug(async_call):
 
 
 @pytest.mark.parametrize("async_call", [False, True])
-def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
-    """Tokens burned by an attempt that later failed are still billed to the caller."""
+def test_usage_separates_last_attempt_from_cumulative_totals(async_call):
+    """Usage separates the final attempt from every billed model response."""
     calls = 0
 
     def simulate_malformed_transient_then_successful_attempts(messages, agent_info):
@@ -282,8 +282,10 @@ def test_usage_includes_tokens_spent_on_failed_attempts(async_call):
         response = client.system_one(model, "document", questions)
 
     assert calls == 3
-    assert response.usage.input_tokens == 200
-    assert response.usage.output_tokens == 100
+    assert response.usage.input_tokens == 100
+    assert response.usage.output_tokens == 50
+    assert response.usage.input_tokens_total == 200
+    assert response.usage.output_tokens_total == 100
     assert response.usage.n_retries == 1
     assert response.usage.n_retries_malformed_structure == 1
     assert len(response.debug["llm_attempts"]) == 3
@@ -382,6 +384,10 @@ def test_malformed_structure_is_retried(
     assert calls == 2
     assert response.usage.n_retries == 0
     assert response.usage.n_retries_malformed_structure == 1
+    assert response.usage.input_tokens == 11
+    assert response.usage.output_tokens == 7
+    assert response.usage.input_tokens_total == 22
+    assert response.usage.output_tokens_total == 14
     assert len(response.debug["llm_attempts"]) == 2
     assert len(response.debug["retry_reasons"]) == 1
     retry_reason_category, retry_reason_msg = response.debug["retry_reasons"][0]
