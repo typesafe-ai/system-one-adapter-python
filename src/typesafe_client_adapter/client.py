@@ -13,6 +13,7 @@ from pydantic_ai import Agent, NativeOutput, PromptedOutput
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage
 from typesafe_client import RetryConfig, TypeSafeClient
+from typesafe_client.api.api_client import TypeSafeApiError
 from typesafe_client.api.models import (
     ChoiceAnswer,
     NoulAnswer,
@@ -171,6 +172,19 @@ class _EvaluationRun:
             )
         self._model_request_count_at_agent_run_start = self.run_usage.requests
 
+    def build_evaluation_debug_data(self) -> dict[str, Any]:
+        """Build diagnostics for a successful response or terminal exception.
+
+        :return: Retry reasons and model attempts.
+        """
+        return {
+            **self.model_request_debug_data,
+            "retry_reasons": [
+                (retry_reason.category, retry_reason.msg)
+                for retry_reason in self.retry_reasons
+            ],
+        }
+
     def response(self, output: BaseModel, n_retries: int) -> SystemOneResponse:
         """Build the response from a successful attempt.
 
@@ -213,11 +227,7 @@ class _EvaluationRun:
             ),
             debug={
                 **probability_debug_data(probability_normalizations),
-                **self.model_request_debug_data,
-                "retry_reasons": [
-                    (retry_reason.category, retry_reason.msg)
-                    for retry_reason in self.retry_reasons
-                ],
+                **self.build_evaluation_debug_data(),
             },
         )
 
@@ -330,11 +340,15 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 usage=evaluation.run_usage,
             )
 
-        result, n_retries = run_with_retries(
-            run_pydantic_agent_attempt,
-            self.retry,
-            evaluation.retry_reasons,
-        )
+        try:
+            result, n_retries = run_with_retries(
+                run_pydantic_agent_attempt,
+                self.retry,
+                evaluation.retry_reasons,
+            )
+        except TypeSafeApiError as error:
+            error.debug = evaluation.build_evaluation_debug_data()
+            raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
     async def system_one_async(
@@ -353,11 +367,15 @@ class TypeSafeClientAdapter(TypeSafeClient):
                 usage=evaluation.run_usage,
             )
 
-        result, n_retries = await run_with_retries_async(
-            run_pydantic_agent_attempt_async,
-            self.retry,
-            evaluation.retry_reasons,
-        )
+        try:
+            result, n_retries = await run_with_retries_async(
+                run_pydantic_agent_attempt_async,
+                self.retry,
+                evaluation.retry_reasons,
+            )
+        except TypeSafeApiError as error:
+            error.debug = evaluation.build_evaluation_debug_data()
+            raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
     def close(self) -> None:

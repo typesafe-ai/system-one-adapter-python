@@ -400,6 +400,8 @@ Repeating a request does not guarantee identical nondeterministic model output.
   - a public PydanticAI `model_request` hook captures the logical request immediately before the model call
   - these fields describe the provider-independent PydanticAI request, not the provider's final HTTP body
   - serialized messages retain timestamps, run IDs, and conversation IDs for complete debugging context
+  - terminal exceptions expose the same diagnostics on `.debug`
+    - failed malformed-output calls retain every raw response and corrective validation message
 - Probability normalization
   - `normalize_probabilities=False` preserves LLM probabilities and only reports errors
   - `normalize_probabilities=True` renormalizes score and choice distributions
