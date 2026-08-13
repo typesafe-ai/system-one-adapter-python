@@ -130,6 +130,8 @@ TypeSafeClientAdapter response:
   "usage": {
     "input_tokens": 756,
     "output_tokens": 80,
+    "input_tokens_total": 756,
+    "output_tokens_total": 80,
     "n_retries": 0,
     "n_retries_malformed_structure": 0
   },
@@ -381,7 +383,8 @@ Repeating a request does not guarantee identical nondeterministic model output.
 - Question validation
   - score and choice questions require at least two criteria
 - Telemetry
-  - `input_tokens` and `output_tokens` aggregate every PydanticAI request made during the call, including malformed-structure retries and attempts that later failed and were retried, so a retried call is never under-billed
+  - `input_tokens` and `output_tokens` report the final successful model attempt
+  - `input_tokens_total` and `output_tokens_total` aggregate every PydanticAI response received during the call, including malformed-structure attempts that later failed and attempts repeated after transient failures
   - `n_retries` counts retries of transient provider failures
   - `n_retries_malformed_structure` counts PydanticAI corrective retries for malformed output
   - `latency` is end-to-end request latency in seconds, including retries

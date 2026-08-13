@@ -10,8 +10,9 @@ from typing import Any, Self, cast
 
 from pydantic import BaseModel
 from pydantic_ai import Agent, NativeOutput, PromptedOutput
+from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models import Model
-from pydantic_ai.usage import RunUsage
+from pydantic_ai.usage import RequestUsage, RunUsage
 from typesafe_client import RetryConfig, TypeSafeClient
 from typesafe_client.api.api_client import TypeSafeApiError
 from typesafe_client.api.models import (
@@ -215,12 +216,26 @@ class _EvaluationRun:
             0,
             self.run_usage.requests - self._model_request_count_at_agent_run_start - 1,
         )
+        last_request_usage = next(
+            (
+                llm_attempt["llm_response"].usage
+                for llm_attempt in reversed(
+                    self.model_request_debug_data["llm_attempts"]
+                )
+                if isinstance(llm_attempt["llm_response"], ModelResponse)
+            ),
+            None,
+        )
+        if not isinstance(last_request_usage, RequestUsage):
+            raise RuntimeError("Successful evaluation has no model response usage")
         return SystemOneResponse(
             model=self.model_name,
             answers=answers,
             usage=Usage(
-                input_tokens=self.run_usage.input_tokens,
-                output_tokens=self.run_usage.output_tokens,
+                input_tokens=last_request_usage.input_tokens,
+                output_tokens=last_request_usage.output_tokens,
+                input_tokens_total=self.run_usage.input_tokens,
+                output_tokens_total=self.run_usage.output_tokens,
                 n_retries=n_retries,
                 n_retries_malformed_structure=n_retries_malformed_structure,
                 latency=latency,

@@ -30,6 +30,8 @@
   "usage": {
     "input_tokens": 917,
     "output_tokens": 118,
+    "input_tokens_total": 917,
+    "output_tokens_total": 118,
     "n_retries": 0,
     "n_retries_malformed_structure": 0
   },
