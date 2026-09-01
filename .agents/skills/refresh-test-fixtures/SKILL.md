@@ -1,6 +1,6 @@
 ---
 name: refresh-test-fixtures
-description: Audit and refresh TypeSafeClientAdapter test expected data after changes to prompts, output schemas, providers, models, request serialization, response parsing, or recorded live API behavior. Use when editing client instructions or Pydantic output models, when cassette-backed tests no longer match, or before finishing a PR that changes model-facing behavior.
+description: Audit and refresh SystemOneClientAdapter test expected data after changes to prompts, output schemas, providers, models, request serialization, response parsing, or recorded live API behavior. Use when editing client instructions or Pydantic output models, when cassette-backed tests no longer match, or before finishing a PR that changes model-facing behavior.
 ---
 
 # Refresh Test Fixtures

@@ -1,6 +1,6 @@
-# TypeSafeClientAdapter
+# SystemOneClientAdapter
 
-TypeSafeClientAdapter is a library that is a drop-in replacement for the TypeSafeClient and API, but using LLM APIs.
+SystemOneClientAdapter is a library that is a drop-in replacement for the TypeSafeClient and API, but using LLM APIs.
 
 It's main uses cases are
  - Evaluating TypeSafe's API vs an LLM API for cost/speed/intelligence
@@ -9,7 +9,7 @@ It's main uses cases are
 ## Usage
 
 ```python
-from typesafe_client_adapter import TypeSafeClientAdapter
+from system_one_client_adapter import SystemOneClientAdapter
 from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import (
     NoulQuestion,
@@ -17,8 +17,8 @@ from typesafe_client.api.models import (
     ChoiceQuestion,
 )
 
-# TypeSafeClientAdapter has the same system_one interface as TypeSafeClient.
-typesafe_client_adapter = TypeSafeClientAdapter(
+# SystemOneClientAdapter has the same system_one interface as TypeSafeClient.
+system_one_client_adapter = SystemOneClientAdapter(
     structured_outputs=True,
     llm_answer_mode="probabilities",
     normalize_probabilities=True,
@@ -49,7 +49,7 @@ questions = {
 }
 
 typesafe_response = typesafe_client.system_one("speed_latest", document, questions)
-llm_response = typesafe_client_adapter.system_one("gpt-4o-mini", document, questions)
+llm_response = system_one_client_adapter.system_one("gpt-4o-mini", document, questions)
 
 # llm_response will have a nearly identical shape to typesafe_response
 print(typesafe_response.model_dump_json(indent=2))
@@ -95,7 +95,7 @@ TypeSafe response:
 }
 ```
 
-TypeSafeClientAdapter response:
+SystemOneClientAdapter response:
 
 ```json
 {
@@ -424,7 +424,7 @@ Repeating a request does not guarantee identical nondeterministic model output.
     - the status gate is what keeps rate-limit wording (429 `Too many tokens per minute`) out of the mapping; do not widen the fragments without it
     - codes that are not context-window-specific stay out, notably OpenAI's `string_above_max_length`, which is generic field-length validation
 - Compatibility scope
-  - `TypeSafeClientAdapter` subclasses `TypeSafeClient`
+  - `SystemOneClientAdapter` subclasses `TypeSafeClient`
   - supports synchronous and asynchronous `system_one`, context management, `close`, and `aclose`
   - accepts the same documents and question models and returns the same response models
 - `SystemOneResponse` includes `.model`, `.answers`, `.usage`, and `.debug`; each answer includes `.type`.

@@ -2,7 +2,7 @@
 
 import pytest
 
-from typesafe_client_adapter.utils.probability_normalization import (
+from system_one_client_adapter.utils.probability_normalization import (
     normalize_probabilities_of_all_answers,
     probability_debug_data,
 )
