@@ -1,5 +1,5 @@
 [project]
-name = "typesafe-client-adapter"
+name = "system-one-client-adapter"
 version = "0.1.0"
 description = "Drop-in TypeSafeClient replacement backed by LLM APIs via PydanticAI"
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/typesafe-ai/TypeSafeClientAdapter"
+Repository = "https://github.com/typesafe-ai/SystemOneClientAdapter"
 
 [dependency-groups]
 dev = [
@@ -29,7 +29,7 @@ name = "typesafe"
 url = "https://pypi.typesafe.ai/"
 
 [tool.uv.build-backend]
-module-name = "typesafe_client_adapter"
+module-name = "system_one_client_adapter"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

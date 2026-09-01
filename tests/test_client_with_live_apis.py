@@ -28,7 +28,7 @@ from pytest import param
 from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
-from typesafe_client_adapter import TypeSafeClientAdapter
+from system_one_client_adapter import SystemOneClientAdapter
 
 DOCUMENT = (
     "The reviewer calls this entirely invented novel about dragons and wizards a "
@@ -136,7 +136,7 @@ def test_live_responses_match_reference_shape(
     answer_mode,
     request,
 ):
-    client = TypeSafeClientAdapter(
+    client = SystemOneClientAdapter(
         structured_outputs=structured_outputs,
         llm_answer_mode=answer_mode,
     )

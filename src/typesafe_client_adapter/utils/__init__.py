@@ -1,1 +1,0 @@
-"""Internal TypeSafeClientAdapter utilities."""

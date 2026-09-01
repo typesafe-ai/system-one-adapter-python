@@ -10,14 +10,14 @@ from typesafe_client.api.api_client import (
 )
 from typesafe_client.api.retry import NoRetries
 
-from .client import TypeSafeClientAdapter
+from .client import SystemOneClientAdapter
 
 __all__ = [
     "NoRetries",
     "RetryConfig",
+    "SystemOneClientAdapter",
     "TypeSafeApiError",
     "TypeSafeAuthError",
-    "TypeSafeClientAdapter",
     "TypeSafeTimeoutError",
     "TypeSafeTokensExceededError",
     "TypeSafeUnknownError",

@@ -2,7 +2,7 @@
 
 import pytest
 
-from typesafe_client_adapter.utils.confidence_metrics import (
+from system_one_client_adapter.utils.confidence_metrics import (
     choice_confidence,
     score_confidence,
 )
