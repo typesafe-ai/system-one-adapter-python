@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/typesafe-ai/SystemOneClientAdapter/main/spec/system-one-response-v1.schema.json",
+  "title": "System One v1 Response",
+  "description": "Portable successful-response shape from the System One Compatibility Specification.",
+  "type": "object",
+  "required": [
+    "model",
+    "answers",
+    "usage"
+  ],
+  "properties": {
+    "model": {
+      "type": "string"
+    },
+    "answers": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/Answer"
+      }
+    },
+    "usage": {
+      "$ref": "#/$defs/Usage"
+    },
+    "debug": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "Probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "NullableProbability": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Probability"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ProbabilityMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/Probability"
+      }
+    },
+    "NoulAnswer": {
+      "type": "object",
+      "required": [
+        "type",
+        "noul"
+      ],
+      "properties": {
+        "type": {
+          "const": "noul"
+        },
+        "noul": {
+          "$ref": "#/$defs/Probability"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ChoiceAnswer": {
+      "type": "object",
+      "required": [
+        "type",
+        "choice",
+        "confidence",
+        "probabilities"
+      ],
+      "properties": {
+        "type": {
+          "const": "choice"
+        },
+        "choice": {
+          "type": "string"
+        },
+        "confidence": {
+          "$ref": "#/$defs/NullableProbability"
+        },
+        "probabilities": {
+          "$ref": "#/$defs/ProbabilityMap"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ScoreAnswer": {
+      "type": "object",
+      "required": [
+        "type",
+        "score",
+        "confidence",
+        "probabilities"
+      ],
+      "properties": {
+        "type": {
+          "const": "score"
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence": {
+          "$ref": "#/$defs/NullableProbability"
+        },
+        "probabilities": {
+          "$ref": "#/$defs/ProbabilityMap"
+        }
+      },
+      "additionalProperties": true
+    },
+    "Answer": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/NoulAnswer"
+        },
+        {
+          "$ref": "#/$defs/ChoiceAnswer"
+        },
+        {
+          "$ref": "#/$defs/ScoreAnswer"
+        }
+      ]
+    },
+    "Usage": {
+      "type": "object",
+      "properties": {
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/typesafe-ai/SystemOneClientAdapter/main/spec/system-one-request-v1.schema.json",
+  "title": "System One v1 Request",
+  "description": "Portable request shape from the System One Compatibility Specification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "model",
+    "document",
+    "questions"
+  ],
+  "properties": {
+    "model": {
+      "type": "string"
+    },
+    "document": {
+      "$ref": "#/$defs/InstructionValue"
+    },
+    "questions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/Question"
+      }
+    }
+  },
+  "$defs": {
+    "JsonValue": {
+      "oneOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          }
+        }
+      ]
+    },
+    "InstructionValue": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          }
+        }
+      ]
+    },
+    "NullableInstructionValue": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/InstructionValue"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "NoulQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "noul"
+        },
+        "instructions": {
+          "$ref": "#/$defs/NullableInstructionValue"
+        },
+        "criteria": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoulCriteria"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "NoulCriteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "true": {
+          "$ref": "#/$defs/NullableInstructionValue"
+        },
+        "false": {
+          "$ref": "#/$defs/NullableInstructionValue"
+        }
+      }
+    },
+    "ChoiceQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "criteria"
+      ],
+      "properties": {
+        "type": {
+          "const": "choice"
+        },
+        "instructions": {
+          "$ref": "#/$defs/NullableInstructionValue"
+        },
+        "criteria": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "$ref": "#/$defs/NullableInstructionValue"
+          }
+        }
+      }
+    },
+    "ScoreQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "criteria"
+      ],
+      "properties": {
+        "type": {
+          "const": "score"
+        },
+        "instructions": {
+          "$ref": "#/$defs/NullableInstructionValue"
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/InstructionValue"
+          }
+        }
+      }
+    },
+    "Question": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/NoulQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChoiceQuestion"
+        },
+        {
+          "$ref": "#/$defs/ScoreQuestion"
+        }
+      ]
+    }
+  }
+}

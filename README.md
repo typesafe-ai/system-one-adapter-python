@@ -2,6 +2,11 @@
 
 SystemOneClientAdapter is a library that is a drop-in replacement for the TypeSafeClient and API, but using LLM APIs.
 
+The [System One Compatibility Specification](SPEC.md) defines the public,
+implementation-neutral request and response contract. Other libraries, services, and
+model backends are invited to implement it and use the included JSON Schemas for
+interoperability.
+
 It's main uses cases are
  - Evaluating TypeSafe's API vs an LLM API for cost/speed/intelligence
  - A backup API in case TypeSafe goes down
@@ -362,7 +367,7 @@ replayed_response = asyncio.run(
 
 Repeating a request does not guarantee identical nondeterministic model output.
 
-# Specification
+# Implementation notes
 
 - PydanticAI for queries
 - Prompt construction
