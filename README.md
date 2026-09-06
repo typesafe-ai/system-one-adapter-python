@@ -376,45 +376,9 @@ provider SDKs transform Pydantic's raw JSON Schema, and those transformations ma
 silently remove or rewrite unsupported keywords without an error or warning. When
 changing output models or upgrading Pydantic, PydanticAI, or a provider SDK, inspect
 the recorded provider request rather than relying only on `model_json_schema()`.
-
-[PR #31](https://github.com/typesafe-ai/SystemOneClientAdapter/pull/31) exposed one
-such failure. Probability-mode Choice and Score answers are nested models, so
-Pydantic originally put their question and criteria in a `description` beside a
-`$ref`:
-
-```json
-"genre": {
-  "$ref": "#/$defs/ProbabilityMap2",
-  "description": "Question: Which genre is this? ..."
-}
-```
-
-Anthropic's Python SDK structured-output transformer silently emitted only the
-reference:
-
-```json
-"genre": {"$ref": "#/$defs/ProbabilityMap2"}
-```
-
-The request remained structurally valid, but the model received the option names and
-numeric bounds without the question or criteria. OpenAI preserved the description,
-and prompted-output mode serialized the unmodified schema into the prompt. The same
-Anthropic SDK early-return behavior is discussed in
-[anthropic-sdk-python #1642](https://github.com/anthropics/anthropic-sdk-python/issues/1642),
-although that issue focuses on a dropped `$defs` sibling.
-
-| Questions and answer mode | Output transport | OpenAI | Anthropic |
-| --- | --- | --- | --- |
-| Choice/Score probabilities | Native (`structured_outputs=True`) | Not affected | Affected before PR #31 |
-| Choice/Score probabilities | Prompted (`structured_outputs=False`) | Not affected | Not affected |
-| Choice/Score discrete | Native or prompted | Not affected | Not affected |
-| Noul probabilities or discrete | Native or prompted | Not affected | Not affected |
-
-Probability-map definitions now carry the question, while each concrete probability
-property carries its own criterion. Reference sites remain bare `$ref` objects, so
-behavior-critical descriptions do not depend on sibling-keyword preservation. The
-demonstrated failure involved `description`; treat other `$ref` siblings as unverified
-until their final provider requests have been inspected as well.
+Pay particular attention to keywords beside `$ref`: their preservation can vary by
+transformer. Keep behavior-critical context inside referenced definitions or concrete
+properties when possible.
 
 # Specification
 
