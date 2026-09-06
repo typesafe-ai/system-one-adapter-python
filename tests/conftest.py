@@ -1,6 +1,9 @@
 """Shared pytest configuration for cassette-backed provider tests."""
 
+import copy
+import json
 import os
+from typing import Any
 
 import pytest
 
@@ -31,6 +34,64 @@ FILTERED_HEADERS = [
 ALLOWED_RESPONSE_HEADERS = {"content-type"}
 
 
+class ReadableJsonSerializer:
+    """Store JSON HTTP bodies as readable objects while preserving VCR replay."""
+
+    @staticmethod
+    def _decode_json_container_if_possible(value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        try:
+            decoded_value = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return value
+        return decoded_value if isinstance(decoded_value, (dict, list)) else value
+
+    @staticmethod
+    def _encode_json_container_if_present(value: Any) -> Any:
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        return value
+
+    @classmethod
+    def serialize(cls, cassette_dict):
+        """Serialize cassette data with decoded JSON request and response bodies."""
+        readable_cassette_dict = copy.deepcopy(cassette_dict)
+        # Decode bodies only in the persisted representation.
+        for interaction in readable_cassette_dict["interactions"]:
+            request = interaction["request"]
+            request["body"] = cls._decode_json_container_if_possible(
+                request.get("body")
+            )
+            response_body = interaction["response"].get("body")
+            if isinstance(response_body, dict):
+                response_body["string"] = cls._decode_json_container_if_possible(
+                    response_body.get("string")
+                )
+        return json.dumps(readable_cassette_dict, ensure_ascii=False, indent=4) + "\n"
+
+    @classmethod
+    def deserialize(cls, cassette_string):
+        """Restore readable JSON bodies to the strings VCR expects."""
+        cassette_dict = json.loads(cassette_string)
+        # Re-encode persisted bodies for VCR's HTTP request and response objects.
+        for interaction in cassette_dict["interactions"]:
+            request = interaction["request"]
+            request["body"] = cls._encode_json_container_if_present(request.get("body"))
+            response_body = interaction["response"].get("body")
+            if isinstance(response_body, dict):
+                response_body["string"] = cls._encode_json_container_if_present(
+                    response_body.get("string")
+                )
+        return cassette_dict
+
+
+def pytest_recording_configure(config, vcr):
+    """Replace VCR's JSON serializer with the readable-body variant."""
+    # Override VCR's string-preserving JSON serializer for cassette persistence.
+    vcr.register_serializer("json", ReadableJsonSerializer())
+
+
 def scrub_response(response):
     """Drop every response header outside the allowlist.
 
@@ -57,8 +118,8 @@ def vcr_config():
     :return: VCR configuration passed to ``VCR.use_cassettes``.
     """
     return {
-        # JSON rather than vcrpy's default YAML, so a cassette diffs like the payloads
-        # it holds instead of as a wall of block scalars.
+        # The registered JSON serializer keeps HTTP bodies as nested objects, so the
+        # cassette diffs like its payloads instead of escaped string literals.
         "serializer": "json",
         "filter_headers": FILTERED_HEADERS,
         "filter_query_parameters": ["api_key", "key"],

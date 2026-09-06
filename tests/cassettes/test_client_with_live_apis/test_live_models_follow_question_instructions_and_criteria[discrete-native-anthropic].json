@@ -12,7 +12,7 @@
                             "role": "user",
                             "content": [
                                 {
-                                    "text": "<document>\n\"The reviewer calls this entirely invented novel about dragons and wizards a flawless masterpiece and the best book they have ever read. They say it has no weaknesses, offer only unreserved praise, and urge everyone to read it.\"\n</document>",
+                                    "text": "<document>\n\"Catalog facts:\\n- marker_fen has state DORMANT.\\n- marker_tor has state ACTIVE.\\n\\nShipping facts:\\n- The parcel's handling class is CLASS_CRYSTAL.\\n\"\n</document>",
                                     "type": "text"
                                 }
                             ]
@@ -27,28 +27,27 @@
                                     "TypeSafeAnswers": {
                                         "type": "object",
                                         "properties": {
-                                            "positive": {
-                                                "type": "boolean",
-                                                "description": "The book review is positive."
-                                            },
-                                            "rating": {
-                                                "type": "integer",
-                                                "description": "How favorable the reviewer's overall assessment is.\nScore levels, answer with the integer:\n0 = The reviewer condemns the book and urges readers to avoid it.\n1 = The reviewer is mostly critical and does not recommend the book.\n2 = The reviewer expresses mixed or neutral feelings about the book.\n3 = The reviewer praises the book overall while noting meaningful flaws.\n4 = The reviewer offers unreserved praise and an emphatic recommendation.\n\n{exclusiveMaximum: 5, minimum: 0}"
-                                            },
-                                            "genre": {
+                                            "instruction_probe": {
                                                 "type": "string",
                                                 "enum": [
-                                                    "fiction",
-                                                    "nonfiction"
+                                                    "marker_fen",
+                                                    "marker_tor"
                                                 ],
-                                                "description": "Which genre this review is about.\nChoice labels, answer with one label:\nfiction = A novel or short story.\nnonfiction = A book based on facts, real events, or ideas."
+                                                "description": "Return the only marker whose state is ACTIVE.\nChoice labels, answer with one label:\nmarker_fen = The marker_fen catalog entry.\nmarker_tor = The marker_tor catalog entry."
+                                            },
+                                            "criteria_probe": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "route_7q",
+                                                    "route_2m"
+                                                ],
+                                                "description": "Return the correct opaque handling route for the parcel.\nChoice labels, answer with one label:\nroute_7q = Use when the handling class is CLASS_CRYSTAL.\nroute_2m = Use when the handling class is CLASS_STEEL."
                                             }
                                         },
                                         "additionalProperties": false,
                                         "required": [
-                                            "positive",
-                                            "rating",
-                                            "genre"
+                                            "instruction_probe",
+                                            "criteria_probe"
                                         ]
                                     }
                                 },
@@ -126,7 +125,7 @@
                         "600"
                     ],
                     "content-length": [
-                        "1906"
+                        "1552"
                     ]
                 }
             },
@@ -143,27 +142,27 @@
                 "body": {
                     "string": {
                         "model": "claude-haiku-4-5-20251001",
-                        "id": "msg_011Cdyg7cuM8GdsWbzPceREo",
+                        "id": "msg_011CenycTz2vVVTgaZr5Hr3x",
                         "type": "message",
                         "role": "assistant",
                         "content": [
                             {
                                 "type": "text",
-                                "text": "{\"answers\": {\"positive\": true, \"rating\": 4, \"genre\": \"fiction\"}}"
+                                "text": "{\"answers\": {\"instruction_probe\": \"marker_tor\", \"criteria_probe\": \"route_7q\"}}"
                             }
                         ],
                         "stop_reason": "end_turn",
                         "stop_sequence": null,
                         "stop_details": null,
                         "usage": {
-                            "input_tokens": 610,
+                            "input_tokens": 552,
                             "cache_creation_input_tokens": 0,
                             "cache_read_input_tokens": 0,
                             "cache_creation": {
                                 "ephemeral_5m_input_tokens": 0,
                                 "ephemeral_1h_input_tokens": 0
                             },
-                            "output_tokens": 24,
+                            "output_tokens": 28,
                             "service_tier": "standard",
                             "inference_geo": "not_available"
                         }

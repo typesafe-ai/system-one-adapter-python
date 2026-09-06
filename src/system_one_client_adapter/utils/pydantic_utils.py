@@ -69,15 +69,28 @@ def create_llm_output_model(
             question,
             llm_answer_mode,
         )
-        fields[f"answer_{index}"] = (
-            answer_type,
-            Field(
+        is_probability_map = llm_answer_mode == "probabilities" and isinstance(
+            question, (ChoiceQuestion, ScoreQuestion)
+        )
+        # Choice and Score probability answers are nested models emitted as `$ref`s.
+        # Anthropic's SDK silently discards sibling keywords in native structured
+        # output, which previously removed the question and criteria. Keep the
+        # reference site bare; the model definition and its concrete properties carry
+        # that context instead.
+        output_field = (
+            Field(alias=question_id)
+            if is_probability_map
+            else Field(
                 alias=question_id,
                 description=_build_llm_output_field_description(
                     question,
                     llm_answer_mode,
                 ),
-            ),
+            )
+        )
+        fields[f"answer_{index}"] = (
+            answer_type,
+            output_field,
         )
 
     answers_model = create_model(
@@ -124,19 +137,31 @@ def _create_llm_answer_type_for_question(
     if isinstance(question, ScoreQuestion):
         if llm_answer_mode == "discrete":
             return Annotated[int, Field(ge=0, lt=len(question.criteria))]
-        answers = [str(score) for score in range(len(question.criteria))]
+        answers_and_criteria = [
+            (str(score), criterion)
+            for score, criterion in enumerate(question.criteria)
+        ]
     else:
         answers = list(question.criteria)
         if llm_answer_mode == "discrete":
             return Literal.__getitem__(tuple(answers))
+        answers_and_criteria = list(question.criteria.items())
 
+    # Put criteria on their concrete properties so they survive `$ref` transforms.
     probability_fields = {
-        f"probability_{answer_index}": (Probability, Field(alias=answer))
-        for answer_index, answer in enumerate(answers)
+        f"probability_{answer_index}": (
+            Probability,
+            Field(
+                alias=answer,
+                description=_serialize_instruction_value_for_prompt(criterion),
+            ),
+        )
+        for answer_index, (answer, criterion) in enumerate(answers_and_criteria)
     }
     return create_model(
         f"ProbabilityMap{index}",
         __config__=ConfigDict(extra="forbid"),
+        __doc__=_build_llm_output_question_description(question, llm_answer_mode),
         **probability_fields,
     )
 
@@ -145,24 +170,7 @@ def _build_llm_output_field_description(
     question: Question,
     llm_answer_mode: AnswerMode,
 ) -> str:
-    description = _serialize_instruction_value_for_prompt(question.instructions)
-    if isinstance(question, NoulQuestion) and llm_answer_mode == "probabilities":
-        description = (
-            "Probability that the answer is yes or the assertion is true. "
-            "0 means no or false, 0.5 means uncertain, and 1 means yes or true.\n"
-            f"Question: {description}"
-        )
-    elif isinstance(question, ScoreQuestion) and llm_answer_mode == "probabilities":
-        description = (
-            "Each property maps a rubric level to the probability that the document "
-            f"matches it.\nQuestion: {description}"
-        )
-    elif isinstance(question, ChoiceQuestion) and llm_answer_mode == "probabilities":
-        description = (
-            "Each property maps an option to the probability that it is the best "
-            "answer.\n"
-            f"Question: {description}"
-        )
+    description = _build_llm_output_question_description(question, llm_answer_mode)
 
     if isinstance(question, ScoreQuestion):
         levels = "\n".join(
@@ -191,6 +199,31 @@ def _build_llm_output_field_description(
         f"{description}\nTrue criteria: {true_criteria}\n"
         f"False criteria: {false_criteria}"
     )
+
+
+def _build_llm_output_question_description(
+    question: Question,
+    llm_answer_mode: AnswerMode,
+) -> str:
+    description = _serialize_instruction_value_for_prompt(question.instructions)
+    if isinstance(question, NoulQuestion) and llm_answer_mode == "probabilities":
+        description = (
+            "Probability that the answer is yes or the assertion is true. "
+            "0 means no or false, 0.5 means uncertain, and 1 means yes or true.\n"
+            f"Question: {description}"
+        )
+    elif isinstance(question, ScoreQuestion) and llm_answer_mode == "probabilities":
+        description = (
+            "Each property maps a rubric level to the probability that the document "
+            f"matches it.\nQuestion: {description}"
+        )
+    elif isinstance(question, ChoiceQuestion) and llm_answer_mode == "probabilities":
+        description = (
+            "Each property maps an option to the probability that it is the best "
+            "answer.\n"
+            f"Question: {description}"
+        )
+    return description
 
 
 def _serialize_instruction_value_for_prompt(value: Any) -> str:

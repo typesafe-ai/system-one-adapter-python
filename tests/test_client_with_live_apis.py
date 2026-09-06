@@ -55,6 +55,38 @@ QUESTIONS = {
         },
     ),
 }
+CONTEXT_PROBE_DOCUMENT = """Catalog facts:
+- marker_fen has state DORMANT.
+- marker_tor has state ACTIVE.
+
+Shipping facts:
+- The parcel's handling class is CLASS_CRYSTAL.
+"""
+CONTEXT_PROBE_QUESTIONS = {
+    "instruction_probe": ChoiceQuestion(
+        instructions="Return the only marker whose state is ACTIVE.",
+        criteria={
+            "marker_fen": "The marker_fen catalog entry.",
+            "marker_tor": "The marker_tor catalog entry.",
+        },
+    ),
+    "criteria_probe": ChoiceQuestion(
+        instructions="Return the correct opaque handling route for the parcel.",
+        criteria={
+            "route_7q": "Use when the handling class is CLASS_CRYSTAL.",
+            "route_2m": "Use when the handling class is CLASS_STEEL.",
+        },
+    ),
+}
+MODEL_PARAMETERS = [
+    param("gpt-4o-mini", id="openai"),
+    param("claude-haiku-4-5", id="anthropic"),
+]
+STRUCTURED_OUTPUT_PARAMETERS = [
+    param(False, id="prompted"),
+    param(True, id="native"),
+]
+ANSWER_MODE_PARAMETERS = ["probabilities", "discrete"]
 
 
 def _remove_generated_message_metadata(value):
@@ -118,23 +150,15 @@ def assert_live_response_matches_reference(response, request):
 
 
 @pytest.mark.vcr
-@pytest.mark.parametrize(
-    "model",
-    [
-        param("gpt-4o-mini", id="openai"),
-        param("claude-haiku-4-5", id="anthropic"),
-    ],
-)
-@pytest.mark.parametrize(
-    "structured_outputs",
-    [param(False, id="prompted"), param(True, id="native")],
-)
-@pytest.mark.parametrize("answer_mode", ["probabilities", "discrete"])
+@pytest.mark.parametrize("model", MODEL_PARAMETERS)
+@pytest.mark.parametrize("structured_outputs", STRUCTURED_OUTPUT_PARAMETERS)
+@pytest.mark.parametrize("answer_mode", ANSWER_MODE_PARAMETERS)
 def test_live_responses_match_reference_shape(
     model,
     structured_outputs,
     answer_mode,
     request,
+    vcr,
 ):
     client = SystemOneClientAdapter(
         structured_outputs=structured_outputs,
@@ -147,6 +171,73 @@ def test_live_responses_match_reference_shape(
     else:
         response = client.system_one(model, DOCUMENT, QUESTIONS)
     assert_live_response_matches_reference(response, request)
+
+    # Probability-mode Choice answers are nested schemas reached through `$ref`.
+    # Anthropic's native transformer previously kept the option keys but silently
+    # dropped a sibling description, leaving the model without the question or
+    # criteria. Inspect the final provider request so this test covers the transformed
+    # schema the model actually receives rather than only Pydantic's source schema.
+    if structured_outputs and answer_mode == "probabilities":
+        request_body = json.loads(vcr.requests[0].body)
+        # OpenAI and Anthropic place their native schema in different envelopes.
+        provider_schema = (
+            request_body["output_config"]["format"]["schema"]
+            if "output_config" in request_body
+            else request_body["text"]["format"]["schema"]
+        )
+        # Follow the Choice field's reference to the concrete probability-map schema.
+        definitions = provider_schema["$defs"]
+        choice_reference = definitions["TypeSafeAnswers"]["properties"]["genre"][
+            "$ref"
+        ]
+        choice_schema = definitions[choice_reference.rsplit("/", maxsplit=1)[-1]]
+
+        # Require both the question and every option criterion at their final locations.
+        choice_question = QUESTIONS["genre"]
+        assert isinstance(choice_question, ChoiceQuestion)
+        assert choice_question.instructions in choice_schema["description"]
+        for answer, criterion in choice_question.criteria.items():
+            assert criterion in choice_schema["properties"][answer]["description"]
+
+
+@pytest.mark.vcr
+@pytest.mark.parametrize("model", MODEL_PARAMETERS)
+@pytest.mark.parametrize("structured_outputs", STRUCTURED_OUTPUT_PARAMETERS)
+@pytest.mark.parametrize("answer_mode", ANSWER_MODE_PARAMETERS)
+def test_live_models_follow_question_instructions_and_criteria(
+    model,
+    structured_outputs,
+    answer_mode,
+):
+    client = SystemOneClientAdapter(
+        structured_outputs=structured_outputs,
+        llm_answer_mode=answer_mode,
+    )
+    if structured_outputs:
+        response = asyncio.run(
+            client.system_one_async(
+                model,
+                CONTEXT_PROBE_DOCUMENT,
+                CONTEXT_PROBE_QUESTIONS,
+            )
+        )
+    else:
+        response = client.system_one(
+            model,
+            CONTEXT_PROBE_DOCUMENT,
+            CONTEXT_PROBE_QUESTIONS,
+        )
+
+    # Each answer is unambiguous only when its model-visible context is available, so
+    # require both the expected choice and a high probability for that choice.
+    expected_choices = {
+        "instruction_probe": "marker_tor",
+        "criteria_probe": "route_7q",
+    }
+    for question_id, expected_choice in expected_choices.items():
+        answer = response.answers[question_id]
+        assert answer.choice == expected_choice
+        assert answer.probabilities[expected_choice] > 0.9
 
 
 # TypeSafe is outside the live test's provider x output-mode x answer-mode param grid.
