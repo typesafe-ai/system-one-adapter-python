@@ -135,6 +135,7 @@ def test_live_responses_match_reference_shape(
     structured_outputs,
     answer_mode,
     request,
+    vcr,
 ):
     client = SystemOneClientAdapter(
         structured_outputs=structured_outputs,
@@ -147,6 +148,25 @@ def test_live_responses_match_reference_shape(
     else:
         response = client.system_one(model, DOCUMENT, QUESTIONS)
     assert_live_response_matches_reference(response, request)
+
+    # Ensure native provider transforms preserve the Choice question and criteria.
+    if structured_outputs and answer_mode == "probabilities":
+        request_body = json.loads(vcr.requests[0].body)
+        provider_schema = (
+            request_body["text"]["format"]["schema"]
+            if model == "gpt-4o-mini"
+            else request_body["output_config"]["format"]["schema"]
+        )
+        definitions = provider_schema["$defs"]
+        choice_reference = definitions["TypeSafeAnswers"]["properties"]["genre"][
+            "$ref"
+        ]
+        choice_schema = definitions[choice_reference.rsplit("/", maxsplit=1)[-1]]
+        choice_question = QUESTIONS["genre"]
+        assert isinstance(choice_question, ChoiceQuestion)
+        assert choice_question.instructions in choice_schema["description"]
+        for answer, criterion in choice_question.criteria.items():
+            assert criterion in choice_schema["properties"][answer]["description"]
 
 
 # TypeSafe is outside the live test's provider x output-mode x answer-mode param grid.
