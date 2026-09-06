@@ -56,15 +56,15 @@ QUESTIONS = {
     ),
 }
 CONTEXT_PROBE_DOCUMENT = """Catalog facts:
-- marker_fen's listed material is cedar.
-- marker_tor's listed material is quartz.
+- marker_fen has state DORMANT.
+- marker_tor has state ACTIVE.
 
 Shipping facts:
-- The parcel is a thin crystal vase marked fragile.
+- The parcel's handling class is CLASS_CRYSTAL.
 """
 CONTEXT_PROBE_QUESTIONS = {
     "instruction_probe": ChoiceQuestion(
-        instructions="Return the marker whose listed material is quartz.",
+        instructions="Return the only marker whose state is ACTIVE.",
         criteria={
             "marker_fen": "The marker_fen catalog entry.",
             "marker_tor": "The marker_tor catalog entry.",
@@ -73,8 +73,8 @@ CONTEXT_PROBE_QUESTIONS = {
     "criteria_probe": ChoiceQuestion(
         instructions="Return the correct opaque handling route for the parcel.",
         criteria={
-            "route_7q": "Use for a parcel made of fragile crystal.",
-            "route_2m": "Use for a parcel made of durable steel.",
+            "route_7q": "Use when the handling class is CLASS_CRYSTAL.",
+            "route_2m": "Use when the handling class is CLASS_STEEL.",
         },
     ),
 }
@@ -172,19 +172,27 @@ def test_live_responses_match_reference_shape(
         response = client.system_one(model, DOCUMENT, QUESTIONS)
     assert_live_response_matches_reference(response, request)
 
-    # Guard against native transforms keeping Choice keys but dropping their context.
+    # Probability-mode Choice answers are nested schemas reached through `$ref`.
+    # Anthropic's native transformer previously kept the option keys but silently
+    # dropped a sibling description, leaving the model without the question or
+    # criteria. Inspect the final provider request so this test covers the transformed
+    # schema the model actually receives rather than only Pydantic's source schema.
     if structured_outputs and answer_mode == "probabilities":
         request_body = json.loads(vcr.requests[0].body)
+        # OpenAI and Anthropic place their native schema in different envelopes.
         provider_schema = (
             request_body["output_config"]["format"]["schema"]
             if "output_config" in request_body
             else request_body["text"]["format"]["schema"]
         )
+        # Follow the Choice field's reference to the concrete probability-map schema.
         definitions = provider_schema["$defs"]
         choice_reference = definitions["TypeSafeAnswers"]["properties"]["genre"][
             "$ref"
         ]
         choice_schema = definitions[choice_reference.rsplit("/", maxsplit=1)[-1]]
+
+        # Require both the question and every option criterion at their final locations.
         choice_question = QUESTIONS["genre"]
         assert isinstance(choice_question, ChoiceQuestion)
         assert choice_question.instructions in choice_schema["description"]
@@ -220,9 +228,16 @@ def test_live_models_follow_question_instructions_and_criteria(
             CONTEXT_PROBE_QUESTIONS,
         )
 
-    # Each correct answer depends on a different model-visible context field.
-    assert response.answers["instruction_probe"].choice == "marker_tor"
-    assert response.answers["criteria_probe"].choice == "route_7q"
+    # Each answer is unambiguous only when its model-visible context is available, so
+    # require both the expected choice and a high probability for that choice.
+    expected_choices = {
+        "instruction_probe": "marker_tor",
+        "criteria_probe": "route_7q",
+    }
+    for question_id, expected_choice in expected_choices.items():
+        answer = response.answers[question_id]
+        assert answer.choice == expected_choice
+        assert answer.probabilities[expected_choice] > 0.9
 
 
 # TypeSafe is outside the live test's provider x output-mode x answer-mode param grid.

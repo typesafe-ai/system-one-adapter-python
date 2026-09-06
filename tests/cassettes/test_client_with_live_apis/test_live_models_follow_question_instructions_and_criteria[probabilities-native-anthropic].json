@@ -12,7 +12,7 @@
                             "role": "user",
                             "content": [
                                 {
-                                    "text": "<document>\n\"Catalog facts:\\n- marker_fen's listed material is cedar.\\n- marker_tor's listed material is quartz.\\n\\nShipping facts:\\n- The parcel is a thin crystal vase marked fragile.\\n\"\n</document>",
+                                    "text": "<document>\n\"Catalog facts:\\n- marker_fen has state DORMANT.\\n- marker_tor has state ACTIVE.\\n\\nShipping facts:\\n- The parcel's handling class is CLASS_CRYSTAL.\\n\"\n</document>",
                                     "type": "text"
                                 }
                             ]
@@ -26,7 +26,7 @@
                                 "$defs": {
                                     "ProbabilityMap0": {
                                         "type": "object",
-                                        "description": "Each property maps an option to the probability that it is the best answer.\nQuestion: Return the marker whose listed material is quartz.",
+                                        "description": "Each property maps an option to the probability that it is the best answer.\nQuestion: Return the only marker whose state is ACTIVE.",
                                         "properties": {
                                             "marker_fen": {
                                                 "type": "number",
@@ -49,11 +49,11 @@
                                         "properties": {
                                             "route_7q": {
                                                 "type": "number",
-                                                "description": "Use for a parcel made of fragile crystal.\n\n{maximum: 1, minimum: 0}"
+                                                "description": "Use when the handling class is CLASS_CRYSTAL.\n\n{maximum: 1, minimum: 0}"
                                             },
                                             "route_2m": {
                                                 "type": "number",
-                                                "description": "Use for a parcel made of durable steel.\n\n{maximum: 1, minimum: 0}"
+                                                "description": "Use when the handling class is CLASS_STEEL.\n\n{maximum: 1, minimum: 0}"
                                             }
                                         },
                                         "additionalProperties": false,
@@ -153,7 +153,7 @@
                         "600"
                     ],
                     "content-length": [
-                        "2409"
+                        "2388"
                     ]
                 }
             },
@@ -170,7 +170,7 @@
                 "body": {
                     "string": {
                         "model": "claude-haiku-4-5-20251001",
-                        "id": "msg_011CenufjkBqC5z4mFKN1s48",
+                        "id": "msg_011Cenyc7K5KQFBE15W9pAZx",
                         "type": "message",
                         "role": "assistant",
                         "content": [
@@ -183,7 +183,7 @@
                         "stop_sequence": null,
                         "stop_details": null,
                         "usage": {
-                            "input_tokens": 870,
+                            "input_tokens": 867,
                             "cache_creation_input_tokens": 0,
                             "cache_read_input_tokens": 0,
                             "cache_creation": {
