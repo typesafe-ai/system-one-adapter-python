@@ -69,14 +69,18 @@ def create_llm_output_model(
             question,
             llm_answer_mode,
         )
+        description = _build_llm_output_field_description(question, llm_answer_mode)
+        if isinstance(answer_type, type) and issubclass(answer_type, BaseModel):
+            # A Choice or Score answer is a nested model, which the schema emits as a `$ref`. Some providers' schema
+            # transformers (Anthropic's structured outputs in pydantic-ai) drop keywords sitting beside a `$ref`, so a
+            # description placed only on the field never reaches the model: it would see the option names and nothing
+            # else. Put the question and its criteria on the model itself as well, so they live inside the definition.
+            answer_type.__doc__ = description
         fields[f"answer_{index}"] = (
             answer_type,
             Field(
                 alias=question_id,
-                description=_build_llm_output_field_description(
-                    question,
-                    llm_answer_mode,
-                ),
+                description=description,
             ),
         )
 
