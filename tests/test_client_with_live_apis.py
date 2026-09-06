@@ -149,9 +149,39 @@ def test_live_responses_match_reference_shape(
         response = client.system_one(model, DOCUMENT, QUESTIONS)
     assert_live_response_matches_reference(response, request)
 
-    # Ensure native provider transforms preserve the Choice question and criteria.
+    # Pin the provider-visible prompt and query context; VCR separately matches the
+    # runtime HTTP body byte-for-byte against this recorded request.
+    request_body = json.loads(vcr.requests[0].body)
+    llm_attempt = response.model_dump(mode="json")["debug"]["llm_attempts"][0]
+    expected_prompt = llm_attempt["messages"][0]["instructions"]
+    if model == "gpt-4o-mini":
+        provider_prompt = (
+            request_body["instructions"]
+            if structured_outputs
+            else next(
+                message["content"]
+                for message in request_body["input"]
+                if message["role"] == "system"
+            )
+        )
+    else:
+        provider_prompt = request_body["system"][0]["text"]
+    assert provider_prompt == expected_prompt
+
+    provider_request_text = json.dumps(request_body, ensure_ascii=False)
+    for question in QUESTIONS.values():
+        assert question.instructions in provider_request_text
+        if isinstance(question, ChoiceQuestion):
+            criteria = question.criteria.values()
+        elif isinstance(question, ScoreQuestion):
+            criteria = question.criteria
+        else:
+            continue
+        for criterion in criteria:
+            assert criterion in provider_request_text
+
+    # Keep native Choice context inside the referenced provider schema.
     if structured_outputs and answer_mode == "probabilities":
-        request_body = json.loads(vcr.requests[0].body)
         provider_schema = (
             request_body["text"]["format"]["schema"]
             if model == "gpt-4o-mini"
