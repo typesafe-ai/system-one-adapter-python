@@ -172,28 +172,34 @@ SystemOneClientAdapter response:
               "$defs": {
                 "ProbabilityMap1": {
                   "additionalProperties": false,
+                  "description": "Each property maps a rubric level to the probability that the document matches it.\nQuestion: Star rating for the book based on the review.",
                   "properties": {
                     "0": {
+                      "description": "Horrendous. Unreadable garbage.",
                       "maximum": 1,
                       "minimum": 0,
                       "type": "number"
                     },
                     "1": {
+                      "description": "Pretty bad, but theoretically readable.",
                       "maximum": 1,
                       "minimum": 0,
                       "type": "number"
                     },
                     "2": {
+                      "description": "Acceptable, but just barely.",
                       "maximum": 1,
                       "minimum": 0,
                       "type": "number"
                     },
                     "3": {
+                      "description": "Pretty good. Worth reading but not perfect.",
                       "maximum": 1,
                       "minimum": 0,
                       "type": "number"
                     },
                     "4": {
+                      "description": "Transcendent and impactful. A must read.",
                       "maximum": 1,
                       "minimum": 0,
                       "type": "number"
@@ -211,13 +217,16 @@ SystemOneClientAdapter response:
                 },
                 "ProbabilityMap2": {
                   "additionalProperties": false,
+                  "description": "Each property maps an option to the probability that it is the best answer.\nQuestion: Which genre this review is about.",
                   "properties": {
                     "fiction": {
+                      "description": "A novel or short story.",
                       "maximum": 1,
                       "minimum": 0,
                       "type": "number"
                     },
                     "nonfiction": {
+                      "description": "A book based on facts, real events, or ideas.",
                       "maximum": 1,
                       "minimum": 0,
                       "type": "number"
@@ -240,12 +249,10 @@ SystemOneClientAdapter response:
                       "type": "number"
                     },
                     "stars": {
-                      "$ref": "#/$defs/ProbabilityMap1",
-                      "description": "Each property maps a rubric level to the probability that the document matches it.\nQuestion: Star rating for the book based on the review.\nRequired probability keys:\n0 = Horrendous. Unreadable garbage.\n1 = Pretty bad, but theoretically readable.\n2 = Acceptable, but just barely.\n3 = Pretty good. Worth reading but not perfect.\n4 = Transcendent and impactful. A must read."
+                      "$ref": "#/$defs/ProbabilityMap1"
                     },
                     "genre": {
-                      "$ref": "#/$defs/ProbabilityMap2",
-                      "description": "Each property maps an option to the probability that it is the best answer.\nQuestion: Which genre this review is about.\nRequired probability keys:\nfiction = A novel or short story.\nnonfiction = A book based on facts, real events, or ideas."
+                      "$ref": "#/$defs/ProbabilityMap2"
                     }
                   },
                   "required": [
@@ -362,6 +369,53 @@ replayed_response = asyncio.run(
 
 Repeating a request does not guarantee identical nondeterministic model output.
 
+# Provider schema compatibility
+
+Treat the final provider HTTP schema as the compatibility contract. PydanticAI and
+provider SDKs transform Pydantic's raw JSON Schema, and those transformations may
+silently remove or rewrite unsupported keywords without an error or warning. When
+changing output models or upgrading Pydantic, PydanticAI, or a provider SDK, inspect
+the recorded provider request rather than relying only on `model_json_schema()`.
+
+[PR #31](https://github.com/typesafe-ai/SystemOneClientAdapter/pull/31) exposed one
+such failure. Probability-mode Choice and Score answers are nested models, so
+Pydantic originally put their question and criteria in a `description` beside a
+`$ref`:
+
+```json
+"genre": {
+  "$ref": "#/$defs/ProbabilityMap2",
+  "description": "Question: Which genre is this? ..."
+}
+```
+
+Anthropic's Python SDK structured-output transformer silently emitted only the
+reference:
+
+```json
+"genre": {"$ref": "#/$defs/ProbabilityMap2"}
+```
+
+The request remained structurally valid, but the model received the option names and
+numeric bounds without the question or criteria. OpenAI preserved the description,
+and prompted-output mode serialized the unmodified schema into the prompt. The same
+Anthropic SDK early-return behavior is discussed in
+[anthropic-sdk-python #1642](https://github.com/anthropics/anthropic-sdk-python/issues/1642),
+although that issue focuses on a dropped `$defs` sibling.
+
+| Questions and answer mode | Output transport | OpenAI | Anthropic |
+| --- | --- | --- | --- |
+| Choice/Score probabilities | Native (`structured_outputs=True`) | Not affected | Affected before PR #31 |
+| Choice/Score probabilities | Prompted (`structured_outputs=False`) | Not affected | Not affected |
+| Choice/Score discrete | Native or prompted | Not affected | Not affected |
+| Noul probabilities or discrete | Native or prompted | Not affected | Not affected |
+
+Probability-map definitions now carry the question, while each concrete probability
+property carries its own criterion. Reference sites remain bare `$ref` objects, so
+behavior-critical descriptions do not depend on sibling-keyword preservation. The
+demonstrated failure involved `description`; treat other `$ref` siblings as unverified
+until their final provider requests have been inspected as well.
+
 # Specification
 
 - PydanticAI for queries
@@ -377,7 +431,7 @@ Repeating a request does not guarantee identical nondeterministic model output.
   - `llm_answer_mode="probabilities"` requests probability distributions
     - requests fixed-key probability objects for Choice and Score questions
     - requires every allowed label and forbids additional labels through Pydantic output validation
-    - supplies labels and criteria in each field description
+    - keeps each question on its probability-map definition and each criterion on its concrete probability property
     - maps the probability objects into TypeSafe answers with derived choice, score, and confidence fields
   - `llm_answer_mode="discrete"` maps the selected value to a probability distribution of all 0s except one value of 1.0
 - Question validation
