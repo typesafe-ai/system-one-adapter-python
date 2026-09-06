@@ -71,8 +71,12 @@ def create_llm_output_model(
         )
         description = _build_llm_output_field_description(question, llm_answer_mode)
         if isinstance(answer_type, type) and issubclass(answer_type, BaseModel):
-            # Keep nested-answer context inside the definition so `$ref` transforms
-            # cannot silently discard it from the reference site.
+            # Choice and Score answers are nested models emitted as `$ref`s. Some
+            # provider schema transformers, including Anthropic structured outputs
+            # in PydanticAI, silently drop keywords beside a `$ref`. A description
+            # placed only on the field would not reach the model, which would see
+            # option names without the question or criteria. Put that context on the
+            # model so it remains inside the referenced definition.
             answer_type.__doc__ = description
         fields[f"answer_{index}"] = (
             answer_type,
