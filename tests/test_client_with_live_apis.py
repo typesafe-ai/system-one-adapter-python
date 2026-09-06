@@ -55,6 +55,38 @@ QUESTIONS = {
         },
     ),
 }
+CONTEXT_PROBE_DOCUMENT = """Catalog facts:
+- marker_fen's listed material is cedar.
+- marker_tor's listed material is quartz.
+
+Shipping facts:
+- The parcel is a thin crystal vase marked fragile.
+"""
+CONTEXT_PROBE_QUESTIONS = {
+    "instruction_probe": ChoiceQuestion(
+        instructions="Return the marker whose listed material is quartz.",
+        criteria={
+            "marker_fen": "The marker_fen catalog entry.",
+            "marker_tor": "The marker_tor catalog entry.",
+        },
+    ),
+    "criteria_probe": ChoiceQuestion(
+        instructions="Return the correct opaque handling route for the parcel.",
+        criteria={
+            "route_7q": "Use for a parcel made of fragile crystal.",
+            "route_2m": "Use for a parcel made of durable steel.",
+        },
+    ),
+}
+MODEL_PARAMETERS = [
+    param("gpt-4o-mini", id="openai"),
+    param("claude-haiku-4-5", id="anthropic"),
+]
+STRUCTURED_OUTPUT_PARAMETERS = [
+    param(False, id="prompted"),
+    param(True, id="native"),
+]
+ANSWER_MODE_PARAMETERS = ["probabilities", "discrete"]
 
 
 def _remove_generated_message_metadata(value):
@@ -118,18 +150,9 @@ def assert_live_response_matches_reference(response, request):
 
 
 @pytest.mark.vcr
-@pytest.mark.parametrize(
-    "model",
-    [
-        param("gpt-4o-mini", id="openai"),
-        param("claude-haiku-4-5", id="anthropic"),
-    ],
-)
-@pytest.mark.parametrize(
-    "structured_outputs",
-    [param(False, id="prompted"), param(True, id="native")],
-)
-@pytest.mark.parametrize("answer_mode", ["probabilities", "discrete"])
+@pytest.mark.parametrize("model", MODEL_PARAMETERS)
+@pytest.mark.parametrize("structured_outputs", STRUCTURED_OUTPUT_PARAMETERS)
+@pytest.mark.parametrize("answer_mode", ANSWER_MODE_PARAMETERS)
 def test_live_responses_match_reference_shape(
     model,
     structured_outputs,
@@ -153,9 +176,9 @@ def test_live_responses_match_reference_shape(
     if structured_outputs and answer_mode == "probabilities":
         request_body = json.loads(vcr.requests[0].body)
         provider_schema = (
-            request_body["text"]["format"]["schema"]
-            if model == "gpt-4o-mini"
-            else request_body["output_config"]["format"]["schema"]
+            request_body["output_config"]["format"]["schema"]
+            if "output_config" in request_body
+            else request_body["text"]["format"]["schema"]
         )
         definitions = provider_schema["$defs"]
         choice_reference = definitions["TypeSafeAnswers"]["properties"]["genre"][
@@ -167,6 +190,39 @@ def test_live_responses_match_reference_shape(
         assert choice_question.instructions in choice_schema["description"]
         for answer, criterion in choice_question.criteria.items():
             assert criterion in choice_schema["properties"][answer]["description"]
+
+
+@pytest.mark.vcr
+@pytest.mark.parametrize("model", MODEL_PARAMETERS)
+@pytest.mark.parametrize("structured_outputs", STRUCTURED_OUTPUT_PARAMETERS)
+@pytest.mark.parametrize("answer_mode", ANSWER_MODE_PARAMETERS)
+def test_live_models_follow_question_instructions_and_criteria(
+    model,
+    structured_outputs,
+    answer_mode,
+):
+    client = SystemOneClientAdapter(
+        structured_outputs=structured_outputs,
+        llm_answer_mode=answer_mode,
+    )
+    if structured_outputs:
+        response = asyncio.run(
+            client.system_one_async(
+                model,
+                CONTEXT_PROBE_DOCUMENT,
+                CONTEXT_PROBE_QUESTIONS,
+            )
+        )
+    else:
+        response = client.system_one(
+            model,
+            CONTEXT_PROBE_DOCUMENT,
+            CONTEXT_PROBE_QUESTIONS,
+        )
+
+    # Each correct answer depends on a different model-visible context field.
+    assert response.answers["instruction_probe"].choice == "marker_tor"
+    assert response.answers["criteria_probe"].choice == "route_7q"
 
 
 # TypeSafe is outside the live test's provider x output-mode x answer-mode param grid.
