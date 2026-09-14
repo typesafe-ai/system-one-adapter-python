@@ -2041,7 +2041,7 @@ wheels = [
 ]
 
 [[package]]
-name = "system-one-client-adapter"
+name = "open-system-one"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
