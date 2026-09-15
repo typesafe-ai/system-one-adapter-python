@@ -15,7 +15,7 @@ from typesafe_client.api.api_client import (
 )
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
-from open_system_one import OpenSystemOne
+from open_system_one_client import OpenSystemOneClient
 
 DOCUMENT = "This is a delightful fiction novel."
 QUESTIONS = {
@@ -66,7 +66,7 @@ def test_native_output_omits_prompted_schema_instructions(
     messages_by_output_mode = {}
     model = create_model_returning_response(response_data)
     for structured_outputs in (False, True):
-        response = OpenSystemOne(
+        response = OpenSystemOneClient(
             structured_outputs=structured_outputs,
             llm_answer_mode=answer_mode,
         ).system_one(
@@ -98,7 +98,7 @@ def test_native_output_omits_prompted_schema_instructions(
 def test_structured_document_prompt_is_delimited_and_escapes_embedded_tags():
     model = create_model_returning_response({"answers": {"answer": 0.75}})
 
-    response = OpenSystemOne(
+    response = OpenSystemOneClient(
         structured_outputs=True,
         llm_answer_mode="probabilities",
     ).system_one(
@@ -132,7 +132,7 @@ def test_transient_errors_are_retried(async_call):
 
     model = FunctionModel(fail_first_provider_attempt, model_name="test-model")
     retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
-    client = OpenSystemOne(
+    client = OpenSystemOneClient(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         retry=retry,
@@ -177,7 +177,7 @@ def test_retries_are_exhausted(async_call):
 
     model = FunctionModel(raise_retryable_provider_error, model_name="test-model")
     retry = RetryConfig(max_attempts=3, initial_backoff=0, jitter=False)
-    client = OpenSystemOne(
+    client = OpenSystemOneClient(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         retry=retry,
@@ -214,7 +214,7 @@ def test_malformed_retry_exhaustion_preserves_debug(async_call):
         )
 
     model = FunctionModel(return_malformed_response, model_name="test-model")
-    client = OpenSystemOne(
+    client = OpenSystemOneClient(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         n_retry_malformed_structure=2,
@@ -268,7 +268,7 @@ def test_usage_separates_last_attempt_from_cumulative_totals(async_call):
         model_name="test-model",
     )
     retry = RetryConfig(max_attempts=2, initial_backoff=0, jitter=False)
-    client = OpenSystemOne(
+    client = OpenSystemOneClient(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         retry=retry,
@@ -328,7 +328,7 @@ def test_invalid_questions_are_rejected(questions):
     model = create_model_returning_response({"answers": {}})
 
     with pytest.raises(ValueError):
-        OpenSystemOne(
+        OpenSystemOneClient(
             structured_outputs=True,
             llm_answer_mode="probabilities",
         ).system_one(model, "document", questions)
@@ -371,7 +371,7 @@ def test_malformed_structure_is_retried(
         return_malformed_then_valid_response,
         model_name="test-model",
     )
-    response = OpenSystemOne(
+    response = OpenSystemOneClient(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         n_retry_malformed_structure=1,

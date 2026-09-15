@@ -1,6 +1,6 @@
-# OpenSystemOne
+# OpenSystemOneClient
 
-OpenSystemOne is a library that is a drop-in replacement for the TypeSafeClient and API, but using LLM APIs.
+OpenSystemOneClient is a library that is a drop-in replacement for the TypeSafeClient and API, but using LLM APIs.
 
 It's main uses cases are
  - Evaluating TypeSafe's API vs an LLM API for cost/speed/intelligence
@@ -9,7 +9,7 @@ It's main uses cases are
 ## Usage
 
 ```python
-from open_system_one import OpenSystemOne
+from open_system_one_client import OpenSystemOneClient
 from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import (
     NoulQuestion,
@@ -17,8 +17,8 @@ from typesafe_client.api.models import (
     ChoiceQuestion,
 )
 
-# OpenSystemOne has the same system_one interface as TypeSafeClient.
-open_system_one = OpenSystemOne(
+# OpenSystemOneClient has the same system_one interface as TypeSafeClient.
+open_system_one_client = OpenSystemOneClient(
     structured_outputs=True,
     llm_answer_mode="probabilities",
     normalize_probabilities=True,
@@ -49,7 +49,7 @@ questions = {
 }
 
 typesafe_response = typesafe_client.system_one("speed_latest", document, questions)
-llm_response = open_system_one.system_one("gpt-4o-mini", document, questions)
+llm_response = open_system_one_client.system_one("gpt-4o-mini", document, questions)
 
 # llm_response will have a nearly identical shape to typesafe_response
 print(typesafe_response.model_dump_json(indent=2))
@@ -95,7 +95,7 @@ TypeSafe response:
 }
 ```
 
-OpenSystemOne response:
+OpenSystemOneClient response:
 
 ```json
 {
@@ -442,7 +442,7 @@ properties when possible.
     - the status gate is what keeps rate-limit wording (429 `Too many tokens per minute`) out of the mapping; do not widen the fragments without it
     - codes that are not context-window-specific stay out, notably OpenAI's `string_above_max_length`, which is generic field-length validation
 - Compatibility scope
-  - `OpenSystemOne` subclasses `TypeSafeClient`
+  - `OpenSystemOneClient` subclasses `TypeSafeClient`
   - supports synchronous and asynchronous `system_one`, context management, `close`, and `aclose`
   - accepts the same documents and question models and returns the same response models
 - `SystemOneResponse` includes `.model`, `.answers`, `.usage`, and `.debug`; each answer includes `.type`.

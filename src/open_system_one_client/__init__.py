@@ -1,4 +1,4 @@
-"""OpenSystemOne public API."""
+"""OpenSystemOneClient public API."""
 
 from typesafe_client import RetryConfig
 from typesafe_client.api.api_client import (
@@ -10,11 +10,11 @@ from typesafe_client.api.api_client import (
 )
 from typesafe_client.api.retry import NoRetries
 
-from .client import OpenSystemOne
+from .client import OpenSystemOneClient
 
 __all__ = [
     "NoRetries",
-    "OpenSystemOne",
+    "OpenSystemOneClient",
     "RetryConfig",
     "TypeSafeApiError",
     "TypeSafeAuthError",

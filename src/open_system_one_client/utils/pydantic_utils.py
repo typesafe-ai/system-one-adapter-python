@@ -20,7 +20,7 @@ from typesafe_client.api.models import (
 )
 from typesafe_client.values import QuestionCollectionType, question_to_api_model
 
-from open_system_one.utils.probability_normalization import AnswerMode
+from open_system_one_client.utils.probability_normalization import AnswerMode
 
 Probability: TypeAlias = Annotated[float, Field(ge=0, le=1)]
 

@@ -28,7 +28,7 @@ from pytest import param
 from typesafe_client import TypeSafeClient
 from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
 
-from open_system_one import OpenSystemOne
+from open_system_one_client import OpenSystemOneClient
 
 DOCUMENT = (
     "The reviewer calls this entirely invented novel about dragons and wizards a "
@@ -160,7 +160,7 @@ def test_live_responses_match_reference_shape(
     request,
     vcr,
 ):
-    client = OpenSystemOne(
+    client = OpenSystemOneClient(
         structured_outputs=structured_outputs,
         llm_answer_mode=answer_mode,
     )
@@ -209,7 +209,7 @@ def test_live_models_follow_question_instructions_and_criteria(
     structured_outputs,
     answer_mode,
 ):
-    client = OpenSystemOne(
+    client = OpenSystemOneClient(
         structured_outputs=structured_outputs,
         llm_answer_mode=answer_mode,
     )
