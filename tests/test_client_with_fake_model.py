@@ -314,15 +314,12 @@ def test_usage_separates_last_attempt_from_cumulative_totals(async_call):
     [
         param({}, id="no-questions"),
         param(
-            {"stars": Score(criteria={1: "Bad.", 2: "Good."})}, id="score-missing-zero"
+            {"stars": Score(criteria={0: "Bad.", 1: "Good."})},
+            id="score-object-dict-criteria",
         ),
         param(
-            {"stars": {"type": "score", "criteria": {0: "Bad.", 2: "Good."}}},
-            id="score-gap",
-        ),
-        param(
-            {"stars": Score(criteria={"0": "Bad.", "1": "Good."})},
-            id="score-string-keys",
+            {"stars": {"type": "score", "criteria": {0: "Bad.", 1: "Good."}}},
+            id="score-dict-criteria",
         ),
         param(
             {"stars": Score(instructions="Rating.", criteria=[])},

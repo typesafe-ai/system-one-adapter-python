@@ -181,13 +181,10 @@ def test_live_responses_match_reference_shape(
         model=model,
     )
     if structured_outputs:
-        # Raw SDK inputs and unordered rubric keys must preserve the provider request.
+        # Raw SDK question inputs must preserve the provider request.
         questions = {
             name: msgspec.to_builtins(question) for name, question in QUESTIONS.items()
         }
-        questions["rating"]["criteria"] = dict(
-            reversed(list(enumerate(QUESTIONS["rating"].criteria)))
-        )
         response = asyncio.run(client.system_one(state=STATE, questions=questions))
     else:
         response = client.system_one(STATE, QUESTIONS, model=model)

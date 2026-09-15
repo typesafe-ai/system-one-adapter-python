@@ -34,7 +34,7 @@ def convert_question_collection_to_validated_api_question_models(
     """Convert a question collection to validated API question models.
 
     Reject empty collections, convert dictionary questions to API model instances,
-    and require score and choice questions to define at least two criteria.
+    require list criteria for scores, and at least two criteria for scores and choices.
 
     :param questions: TypeSafe question collection.
     :return: Questions using API model types.
@@ -43,25 +43,10 @@ def convert_question_collection_to_validated_api_question_models(
         raise ValueError("At least one question is required.")
     prepared_questions = {}
     for key, question in questions.items():
-        # Normalize indexed rubrics before validating the tagged SDK question.
-        question_data = msgspec.to_builtins(question)
-        if question_data.get("type") == "score" and isinstance(
-            question_data.get("criteria"), dict
-        ):
-            criteria = question_data["criteria"]
-            if any(type(index) is not int for index in criteria) or sorted(
-                criteria
-            ) != list(range(len(criteria))):
-                raise ValueError(
-                    "Score criteria must be indexed from zero without gaps."
-                )
-            question_data["criteria"] = [
-                criteria[index] for index in range(len(criteria))
-            ]
         # The wire union validates JSON; public question types contain recursive aliases
         # that msgspec cannot decode directly in SDK 0.5.7.
         validated = msgspec.to_builtins(
-            msgspec.convert(question_data, type=WireQuestion)
+            msgspec.convert(msgspec.to_builtins(question), type=WireQuestion)
         )
         question_class = {"noul": Noul, "choice": Choice, "score": Score}[
             validated.pop("type")

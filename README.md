@@ -420,7 +420,7 @@ properties when possible.
   - `llm_answer_mode="discrete"` maps the selected value to a probability distribution of all 0s except one value of 1.0
 - Question validation
   - score and choice questions require at least two criteria
-  - accepts SDK question objects or dictionaries; score criteria dictionaries require consecutive integer keys starting at zero
+  - accepts SDK question objects or dictionaries; score criteria must be a list
 - Telemetry
   - `input_tokens` and `output_tokens` report the final successful model attempt
   - `input_tokens_total` and `output_tokens_total` aggregate every PydanticAI response received during the call, including malformed-structure attempts that later failed and attempts repeated after transient failures
