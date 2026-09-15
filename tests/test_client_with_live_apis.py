@@ -22,13 +22,20 @@ import json
 import os
 from pathlib import Path
 
+import msgspec
 import pytest
 from pydantic_ai import ModelMessagesTypeAdapter
 from pytest import param
-from typesafe_client import TypeSafeClient
-from typesafe_client.api.models import ChoiceQuestion, NoulQuestion, ScoreQuestion
+from typesafe_sdk import (
+    Choice,
+    Noul,
+    Score,
+    ScoreAnswer,
+    SystemOneResponse,
+    TypeSafeClient,
+)
 
-from open_system_one import OpenSystemOne
+from open_system_one import AsyncOpenSystemOne, OpenSystemOne
 
 DOCUMENT = (
     "The reviewer calls this entirely invented novel about dragons and wizards a "
@@ -36,8 +43,8 @@ DOCUMENT = (
     "weaknesses, offer only unreserved praise, and urge everyone to read it."
 )
 QUESTIONS = {
-    "positive": NoulQuestion(instructions="The book review is positive."),
-    "rating": ScoreQuestion(
+    "positive": Noul(instructions="The book review is positive."),
+    "rating": Score(
         instructions="How favorable the reviewer's overall assessment is.",
         criteria=[
             "The reviewer condemns the book and urges readers to avoid it.",
@@ -47,7 +54,7 @@ QUESTIONS = {
             "The reviewer offers unreserved praise and an emphatic recommendation.",
         ],
     ),
-    "genre": ChoiceQuestion(
+    "genre": Choice(
         instructions="Which genre this review is about.",
         criteria={
             "fiction": "A novel or short story.",
@@ -63,14 +70,14 @@ Shipping facts:
 - The parcel's handling class is CLASS_CRYSTAL.
 """
 CONTEXT_PROBE_QUESTIONS = {
-    "instruction_probe": ChoiceQuestion(
+    "instruction_probe": Choice(
         instructions="Return the only marker whose state is ACTIVE.",
         criteria={
             "marker_fen": "The marker_fen catalog entry.",
             "marker_tor": "The marker_tor catalog entry.",
         },
     ),
-    "criteria_probe": ChoiceQuestion(
+    "criteria_probe": Choice(
         instructions="Return the correct opaque handling route for the parcel.",
         criteria={
             "route_7q": "Use when the handling class is CLASS_CRYSTAL.",
@@ -112,10 +119,18 @@ def assert_live_response_matches_reference(response, request):
     :param response: Live or cassette-replayed TypeSafe response.
     :param request: Pytest request identifying the matching expected response.
     """
-    response_data = response.model_dump(mode="json")
+    response_data = (
+        response.model_dump(mode="json")
+        if hasattr(response, "model_dump")
+        else {
+            "model": response.model,
+            "answers": msgspec.to_builtins(response.answers, str_keys=True),
+            "usage": msgspec.to_builtins(response.usage),
+        }
+    )
     expected_answer_probabilities = {
         "positive": response.answers["positive"].noul,
-        "rating": response.answers["rating"].probabilities["4"],
+        "rating": response.answers["rating"].probabilities[4],
         "genre": response.answers["genre"].probabilities["fiction"],
     }
     for question_id, probability in expected_answer_probabilities.items():
@@ -128,10 +143,9 @@ def assert_live_response_matches_reference(response, request):
         assert 0 < latency < 120
 
     expected_response_path = (
-        Path(__file__).with_name("expected_responses")
-        / f"{request.node.name}.json"
+        Path(__file__).with_name("expected_responses") / f"{request.node.name}.json"
     )
-    if request.config.getoption("--record-mode") == "none":
+    if request.config.getoption("--record-mode") in (None, "none"):
         expected_response_data = json.loads(expected_response_path.read_text())
         assert _remove_generated_message_metadata(
             response_data
@@ -160,17 +174,34 @@ def test_live_responses_match_reference_shape(
     request,
     vcr,
 ):
-    client = OpenSystemOne(
+    client_class = AsyncOpenSystemOne if structured_outputs else OpenSystemOne
+    client = client_class(
         structured_outputs=structured_outputs,
         llm_answer_mode=answer_mode,
+        model=model,
     )
     if structured_outputs:
-        response = asyncio.run(
-            client.system_one_async(model, DOCUMENT, QUESTIONS)
+        # Raw SDK inputs and unordered rubric keys must preserve the provider request.
+        questions = {
+            name: msgspec.to_builtins(question) for name, question in QUESTIONS.items()
+        }
+        questions["rating"]["criteria"] = dict(
+            reversed(list(enumerate(QUESTIONS["rating"].criteria)))
         )
+        response = asyncio.run(client.system_one(state=DOCUMENT, questions=questions))
     else:
-        response = client.system_one(model, DOCUMENT, QUESTIONS)
+        response = client.system_one(DOCUMENT, QUESTIONS, model=model)
     assert_live_response_matches_reference(response, request)
+
+    # Shared provider runs protect the SDK's typed views and integer score keys.
+    assert isinstance(response, SystemOneResponse)
+    assert isinstance(response.scores["rating"], ScoreAnswer)
+    assert response.scores["rating"].legend == dict(
+        enumerate(QUESTIONS["rating"].criteria)
+    )
+    assert set(response.scores["rating"].probabilities) == set(range(5))
+    assert response.nouls["positive"] is response.answers["positive"]
+    assert response.choices["genre"] is response.answers["genre"]
 
     # Probability-mode Choice answers are nested schemas reached through `$ref`.
     # Anthropic's native transformer previously kept the option keys but silently
@@ -187,14 +218,12 @@ def test_live_responses_match_reference_shape(
         )
         # Follow the Choice field's reference to the concrete probability-map schema.
         definitions = provider_schema["$defs"]
-        choice_reference = definitions["TypeSafeAnswers"]["properties"]["genre"][
-            "$ref"
-        ]
+        choice_reference = definitions["TypeSafeAnswers"]["properties"]["genre"]["$ref"]
         choice_schema = definitions[choice_reference.rsplit("/", maxsplit=1)[-1]]
 
         # Require both the question and every option criterion at their final locations.
         choice_question = QUESTIONS["genre"]
-        assert isinstance(choice_question, ChoiceQuestion)
+        assert isinstance(choice_question, Choice)
         assert choice_question.instructions in choice_schema["description"]
         for answer, criterion in choice_question.criteria.items():
             assert criterion in choice_schema["properties"][answer]["description"]
@@ -216,16 +245,16 @@ def test_live_models_follow_question_instructions_and_criteria(
     if structured_outputs:
         response = asyncio.run(
             client.system_one_async(
-                model,
                 CONTEXT_PROBE_DOCUMENT,
                 CONTEXT_PROBE_QUESTIONS,
+                model=model,
             )
         )
     else:
         response = client.system_one(
-            model,
             CONTEXT_PROBE_DOCUMENT,
             CONTEXT_PROBE_QUESTIONS,
+            model=model,
         )
 
     # Each answer is unambiguous only when its model-visible context is available, so
@@ -243,8 +272,7 @@ def test_live_models_follow_question_instructions_and_criteria(
 # TypeSafe is outside the live test's provider x output-mode x answer-mode param grid.
 @pytest.mark.vcr
 def test_live_typesafe_response_matches_reference_shape(request):
-    client = TypeSafeClient(api_key=os.environ["TYPESAFE_API_KEY"])
-
-    response = client.system_one("speed_latest", DOCUMENT, QUESTIONS)
+    with TypeSafeClient(api_key=os.environ["TYPESAFE_API_KEY"]) as client:
+        response = client.system_one(DOCUMENT, QUESTIONS, model="speed_latest")
 
     assert_live_response_matches_reference(response, request)

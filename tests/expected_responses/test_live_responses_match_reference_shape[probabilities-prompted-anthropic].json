@@ -15,6 +15,13 @@
         "2": 0.01,
         "3": 0.04,
         "4": 0.93
+      },
+      "legend": {
+        "0": "The reviewer condemns the book and urges readers to avoid it.",
+        "1": "The reviewer is mostly critical and does not recommend the book.",
+        "2": "The reviewer expresses mixed or neutral feelings about the book.",
+        "3": "The reviewer praises the book overall while noting meaningful flaws.",
+        "4": "The reviewer offers unreserved praise and an emphatic recommendation."
       }
     },
     "genre": {

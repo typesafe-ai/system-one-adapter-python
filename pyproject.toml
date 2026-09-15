@@ -11,7 +11,7 @@ dependencies = [
     "anthropic>=0.121.0",
     "openai>=2.53.0",
     "pydantic-ai>=2.27.0",
-    "typesafe-client>=1.0.0",
+    "typesafe-sdk>=0.5.7,<0.6",
 ]
 
 [project.urls]
@@ -23,10 +23,6 @@ dev = [
     "pytest-recording>=0.13.4",
     "ruff>=0.14.14",
 ]
-
-[[tool.uv.index]]
-name = "typesafe"
-url = "https://pypi.typesafe.ai/"
 
 [tool.uv.build-backend]
 module-name = "open_system_one"

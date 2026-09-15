@@ -4,6 +4,7 @@ import json
 from collections.abc import Mapping
 from typing import Annotated, Any, Literal, TypeAlias
 
+import msgspec
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -12,21 +13,23 @@ from pydantic import (
     create_model,
 )
 from pydantic_ai.tools import GenerateToolJsonSchema
-from typesafe_client.api.models import (
-    ChoiceQuestion,
-    NoulQuestion,
-    Question,
-    ScoreQuestion,
+from typesafe_sdk import (
+    Choice,
+    Noul,
+    Questions,
+    Score,
 )
-from typesafe_client.values import QuestionCollectionType, question_to_api_model
+from typesafe_sdk._schemas.models import Question as WireQuestion
 
 from open_system_one.utils.probability_normalization import AnswerMode
+
+Question = Noul | Choice | Score
 
 Probability: TypeAlias = Annotated[float, Field(ge=0, le=1)]
 
 
 def convert_question_collection_to_validated_api_question_models(
-    questions: QuestionCollectionType,
+    questions: Questions,
 ) -> dict[str, Question]:
     """Convert a question collection to validated API question models.
 
@@ -40,9 +43,32 @@ def convert_question_collection_to_validated_api_question_models(
         raise ValueError("At least one question is required.")
     prepared_questions = {}
     for key, question in questions.items():
-        prepared_question = question_to_api_model(question)
+        # Normalize indexed rubrics before validating the tagged SDK question.
+        question_data = msgspec.to_builtins(question)
+        if question_data.get("type") == "score" and isinstance(
+            question_data.get("criteria"), dict
+        ):
+            criteria = question_data["criteria"]
+            if any(type(index) is not int for index in criteria) or sorted(
+                criteria
+            ) != list(range(len(criteria))):
+                raise ValueError(
+                    "Score criteria must be indexed from zero without gaps."
+                )
+            question_data["criteria"] = [
+                criteria[index] for index in range(len(criteria))
+            ]
+        # The wire union validates JSON; public question types contain recursive aliases
+        # that msgspec cannot decode directly in SDK 0.5.7.
+        validated = msgspec.to_builtins(
+            msgspec.convert(question_data, type=WireQuestion)
+        )
+        question_class = {"noul": Noul, "choice": Choice, "score": Score}[
+            validated.pop("type")
+        ]
+        prepared_question = question_class(**validated)
         if (
-            isinstance(prepared_question, (ScoreQuestion, ChoiceQuestion))
+            isinstance(prepared_question, (Score, Choice))
             and len(prepared_question.criteria) < 2
         ):
             raise ValueError(
@@ -70,7 +96,7 @@ def create_llm_output_model(
             llm_answer_mode,
         )
         is_probability_map = llm_answer_mode == "probabilities" and isinstance(
-            question, (ChoiceQuestion, ScoreQuestion)
+            question, (Choice, Score)
         )
         # Choice and Score probability answers are nested models emitted as `$ref`s.
         # Anthropic's SDK silently discards sibling keywords in native structured
@@ -131,15 +157,14 @@ def _create_llm_answer_type_for_question(
     question: Question,
     llm_answer_mode: AnswerMode,
 ) -> Any:
-    if isinstance(question, NoulQuestion):
+    if isinstance(question, Noul):
         return bool if llm_answer_mode == "discrete" else Probability
 
-    if isinstance(question, ScoreQuestion):
+    if isinstance(question, Score):
         if llm_answer_mode == "discrete":
             return Annotated[int, Field(ge=0, lt=len(question.criteria))]
         answers_and_criteria = [
-            (str(score), criterion)
-            for score, criterion in enumerate(question.criteria)
+            (str(score), criterion) for score, criterion in enumerate(question.criteria)
         ]
     else:
         answers = list(question.criteria)
@@ -172,7 +197,7 @@ def _build_llm_output_field_description(
 ) -> str:
     description = _build_llm_output_question_description(question, llm_answer_mode)
 
-    if isinstance(question, ScoreQuestion):
+    if isinstance(question, Score):
         levels = "\n".join(
             f"{score} = {_serialize_instruction_value_for_prompt(criterion)}"
             for score, criterion in enumerate(question.criteria)
@@ -181,7 +206,7 @@ def _build_llm_output_field_description(
             return f"{description}\nScore levels, answer with the integer:\n{levels}"
         return f"{description}\nRequired probability keys:\n{levels}"
 
-    if isinstance(question, ChoiceQuestion):
+    if isinstance(question, Choice):
         choices = "\n".join(
             f"{answer} = {_serialize_instruction_value_for_prompt(criterion)}"
             for answer, criterion in question.criteria.items()
@@ -190,11 +215,15 @@ def _build_llm_output_field_description(
             return f"{description}\nChoice labels, answer with one label:\n{choices}"
         return f"{description}\nRequired probability keys:\n{choices}"
 
-    if not isinstance(question, NoulQuestion) or question.criteria is None:
+    if not isinstance(question, Noul) or question.criteria is None:
         return description
 
-    true_criteria = _serialize_instruction_value_for_prompt(question.criteria.true)
-    false_criteria = _serialize_instruction_value_for_prompt(question.criteria.false)
+    true_criteria = _serialize_instruction_value_for_prompt(
+        question.criteria.get("true")
+    )
+    false_criteria = _serialize_instruction_value_for_prompt(
+        question.criteria.get("false")
+    )
     return (
         f"{description}\nTrue criteria: {true_criteria}\n"
         f"False criteria: {false_criteria}"
@@ -206,18 +235,18 @@ def _build_llm_output_question_description(
     llm_answer_mode: AnswerMode,
 ) -> str:
     description = _serialize_instruction_value_for_prompt(question.instructions)
-    if isinstance(question, NoulQuestion) and llm_answer_mode == "probabilities":
+    if isinstance(question, Noul) and llm_answer_mode == "probabilities":
         description = (
             "Probability that the answer is yes or the assertion is true. "
             "0 means no or false, 0.5 means uncertain, and 1 means yes or true.\n"
             f"Question: {description}"
         )
-    elif isinstance(question, ScoreQuestion) and llm_answer_mode == "probabilities":
+    elif isinstance(question, Score) and llm_answer_mode == "probabilities":
         description = (
             "Each property maps a rubric level to the probability that the document "
             f"matches it.\nQuestion: {description}"
         )
-    elif isinstance(question, ChoiceQuestion) and llm_answer_mode == "probabilities":
+    elif isinstance(question, Choice) and llm_answer_mode == "probabilities":
         description = (
             "Each property maps an option to the probability that it is the best "
             "answer.\n"

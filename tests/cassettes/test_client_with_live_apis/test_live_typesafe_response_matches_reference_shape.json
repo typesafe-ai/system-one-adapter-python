@@ -6,32 +6,31 @@
                 "method": "POST",
                 "uri": "https://api.typesafe.ai/v1/systemone",
                 "body": {
-                    "document": "The reviewer calls this entirely invented novel about dragons and wizards a flawless masterpiece and the best book they have ever read. They say it has no weaknesses, offer only unreserved praise, and urge everyone to read it.",
+                    "state": "The reviewer calls this entirely invented novel about dragons and wizards a flawless masterpiece and the best book they have ever read. They say it has no weaknesses, offer only unreserved praise, and urge everyone to read it.",
                     "model": "speed_latest",
                     "questions": {
                         "positive": {
                             "type": "noul",
-                            "instructions": "The book review is positive.",
-                            "criteria": null
+                            "instructions": "The book review is positive."
                         },
                         "rating": {
                             "type": "score",
-                            "instructions": "How favorable the reviewer's overall assessment is.",
                             "criteria": [
                                 "The reviewer condemns the book and urges readers to avoid it.",
                                 "The reviewer is mostly critical and does not recommend the book.",
                                 "The reviewer expresses mixed or neutral feelings about the book.",
                                 "The reviewer praises the book overall while noting meaningful flaws.",
                                 "The reviewer offers unreserved praise and an emphatic recommendation."
-                            ]
+                            ],
+                            "instructions": "How favorable the reviewer's overall assessment is."
                         },
                         "genre": {
                             "type": "choice",
-                            "instructions": "Which genre this review is about.",
                             "criteria": {
                                 "fiction": "A novel or short story.",
                                 "nonfiction": "A book based on facts, real events, or ideas."
-                            }
+                            },
+                            "instructions": "Which genre this review is about."
                         }
                     }
                 },
@@ -39,23 +38,29 @@
                     "host": [
                         "api.typesafe.ai"
                     ],
-                    "accept": [
-                        "*/*"
-                    ],
                     "accept-encoding": [
-                        "gzip, deflate"
+                        "gzip, deflate, zstd"
                     ],
                     "connection": [
                         "keep-alive"
                     ],
-                    "user-agent": [
-                        "python-httpx/0.28.1"
+                    "accept": [
+                        "application/json"
                     ],
-                    "content-length": [
-                        "1003"
+                    "user-agent": [
+                        "typesafe-sdk/0.5.7"
+                    ],
+                    "x-typesafe-sdk": [
+                        "typesafe-sdk/0.5.7"
+                    ],
+                    "x-typesafe-runtime": [
+                        "python/3.14.4 (darwin; arm64)"
                     ],
                     "content-type": [
                         "application/json"
+                    ],
+                    "content-length": [
+                        "984"
                     ]
                 }
             },
@@ -71,16 +76,16 @@
                 },
                 "body": {
                     "string": {
-                        "model": "speed_v10_mango_loco",
+                        "model": "speed_v12_snowy_flower",
                         "answers": {
                             "positive": {
                                 "type": "noul",
-                                "noul": 1.0
+                                "noul": 0.98
                             },
                             "rating": {
                                 "type": "score",
-                                "score": 4.0,
-                                "confidence": 1.0,
+                                "score": 3.99,
+                                "confidence": 0.99,
                                 "legend": {
                                     "0": "The reviewer condemns the book and urges readers to avoid it.",
                                     "1": "The reviewer is mostly critical and does not recommend the book.",
