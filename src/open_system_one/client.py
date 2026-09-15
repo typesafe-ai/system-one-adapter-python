@@ -31,26 +31,26 @@ from typesafe_client.values import (
     QuestionCollectionType,
 )
 
-from system_one_client_adapter.utils.confidence_metrics import (
+from open_system_one.utils.confidence_metrics import (
     choice_confidence,
     score_confidence,
 )
-from system_one_client_adapter.utils.error_handling import (
+from open_system_one.utils.error_handling import (
     RetryReasons,
     run_with_retries,
     run_with_retries_async,
 )
-from system_one_client_adapter.utils.model_request_debug import (
+from open_system_one.utils.model_request_debug import (
     create_model_request_debug_hooks,
 )
-from system_one_client_adapter.utils.probability_normalization import (
+from open_system_one.utils.probability_normalization import (
     AnswerMode,
     ProbabilityNormalization,
     normalize_probabilities_of_all_answers,
     probability_debug_data,
     rescale_probabilities,
 )
-from system_one_client_adapter.utils.pydantic_utils import (
+from open_system_one.utils.pydantic_utils import (
     Question,
     convert_question_collection_to_validated_api_question_models,
     create_llm_output_model,
@@ -247,7 +247,7 @@ class _EvaluationRun:
         )
 
 
-class SystemOneClientAdapter(TypeSafeClient):
+class OpenSystemOne(TypeSafeClient):
     """Evaluate TypeSafe questions through any PydanticAI model.
 
     :param structured_outputs: Use the provider's native structured-output mode.
