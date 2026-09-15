@@ -450,6 +450,7 @@ properties when possible.
 - Retry distinction
   - `retry=RetryPolicy(...)` configures retries for transient connection, timeout, and retryable HTTP failures; `max_retries` counts retries after the first attempt
   - retries remain disabled by default; a per-call policy overrides the client policy
+  - SDK retry policies default to a 30-second total budget; use `RetryPolicy(timeout=None, ...)` to disable that budget
   - `n_retry_malformed_structure` configures corrective retries for output that fails structural validation
   - the default SDK retry status policy excludes authentication and bad-request errors; malformed output is handled by `n_retry_malformed_structure`
 - Tests make real LLM and TypeSafe API calls, recorded as HTTP cassettes so replay is deterministic (vcrpy via pytest-recording)
