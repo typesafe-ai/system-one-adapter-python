@@ -2,7 +2,7 @@
 
 import pytest
 
-from open_system_one_client.utils.probability_normalization import (
+from open_system_one.utils.probability_normalization import (
     normalize_probabilities_of_all_answers,
     probability_debug_data,
 )

@@ -9,7 +9,7 @@ from pydantic_ai.capabilities import Hooks, WrapModelRequestHandler
 from pydantic_ai.messages import ModelResponse, RetryPromptPart
 from pydantic_ai.models import ModelRequestContext
 
-from open_system_one_client.utils.error_handling import RetryReasons
+from open_system_one.utils.error_handling import RetryReasons
 
 
 def create_model_request_debug_hooks(
