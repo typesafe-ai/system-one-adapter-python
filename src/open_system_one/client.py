@@ -77,12 +77,12 @@ _OUTPUT_SCHEMA_INSTRUCTION_TEMPLATE = (
 )
 
 
-def _serialize_document_as_user_prompt(document: JSONValue) -> str:
-    serialized_document = json.dumps(document, ensure_ascii=False, sort_keys=True)
-    serialized_document = serialized_document.replace("<", "\\u003c").replace(
+def _serialize_state_as_user_prompt(state: JSONValue) -> str:
+    serialized_state = json.dumps(state, ensure_ascii=False, sort_keys=True)
+    serialized_state = serialized_state.replace("<", "\\u003c").replace(
         ">", "\\u003e"
     )
-    return f"<document>\n{serialized_document}\n</document>"
+    return f"<document>\n{serialized_state}\n</document>"
 
 
 def _convert_llm_value_to_typesafe_answer(
@@ -349,7 +349,7 @@ class OpenSystemOne:
         def run_pydantic_agent_attempt() -> Any:
             evaluation.begin_agent_run()
             return evaluation.pydantic_agent.run_sync(
-                _serialize_document_as_user_prompt(state),
+                _serialize_state_as_user_prompt(state),
                 usage=evaluation.run_usage,
             )
 
@@ -383,7 +383,7 @@ class OpenSystemOne:
         def run_pydantic_agent_attempt_async() -> Any:
             evaluation.begin_agent_run()
             return evaluation.pydantic_agent.run(
-                _serialize_document_as_user_prompt(state),
+                _serialize_state_as_user_prompt(state),
                 usage=evaluation.run_usage,
             )
 

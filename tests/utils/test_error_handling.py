@@ -146,7 +146,7 @@ def test_provider_errors(make_error, error_type, expected_status_code):
         OpenSystemOne(
             structured_outputs=True,
             llm_answer_mode="probabilities",
-        ).system_one("document", {"answer": QUESTION}, model=model)
+        ).system_one("state", {"answer": QUESTION}, model=model)
 
     assert isinstance(raised.value, TypeSafeError)
     if expected_status_code is not None:
@@ -320,7 +320,7 @@ def test_provider_http_errors_preserve_status_and_body(
         OpenSystemOne(
             structured_outputs=True,
             llm_answer_mode="probabilities",
-        ).system_one("document", {"answer": QUESTION}, model=model)
+        ).system_one("state", {"answer": QUESTION}, model=model)
 
     assert raised.value.status == status_code
     # Provider SDKs may unwrap the HTTP error envelope before PydanticAI sees it.

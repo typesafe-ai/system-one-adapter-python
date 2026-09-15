@@ -19,7 +19,7 @@ from typesafe_sdk import (
 
 from open_system_one import OpenSystemOne
 
-DOCUMENT = "This is a delightful fiction novel."
+STATE = "This is a delightful fiction novel."
 QUESTIONS = {
     "positive": Noul(instructions="The review is positive."),
     "stars": Score(instructions="Rating.", criteria=["Bad.", "Good."]),
@@ -72,7 +72,7 @@ def test_native_output_omits_prompted_schema_instructions(
             structured_outputs=structured_outputs,
             llm_answer_mode=answer_mode,
         ).system_one(
-            DOCUMENT,
+            STATE,
             {"positive": QUESTIONS["positive"]},
             model=model,
         )
@@ -97,7 +97,7 @@ def test_native_output_omits_prompted_schema_instructions(
     assert native_user_prompt == prompted_user_prompt
 
 
-def test_structured_document_prompt_is_delimited_and_escapes_embedded_tags():
+def test_structured_state_prompt_is_delimited_and_escapes_embedded_tags():
     model = create_model_returning_response({"answers": {"answer": 0.75}})
 
     response = OpenSystemOne(
@@ -146,12 +146,12 @@ def test_transient_errors_are_retried(async_call, retry_on_call):
     if async_call:
         response = asyncio.run(
             client.system_one_async(
-                "document", questions, model=model, retry=call_retry
+                "state", questions, model=model, retry=call_retry
             )
         )
     else:
         response = client.system_one(
-            "document", questions, model=model, retry=call_retry
+            "state", questions, model=model, retry=call_retry
         )
 
     assert calls == 2
@@ -196,9 +196,9 @@ def test_retries_are_exhausted(async_call):
 
     with pytest.raises(TypeSafeAPIError) as raised:
         if async_call:
-            asyncio.run(client.system_one_async("document", questions, model=model))
+            asyncio.run(client.system_one_async("state", questions, model=model))
         else:
-            client.system_one("document", questions, model=model)
+            client.system_one("state", questions, model=model)
 
     assert calls == 3
     assert raised.value.status == 503
@@ -233,9 +233,9 @@ def test_malformed_retry_exhaustion_preserves_debug(async_call):
 
     with pytest.raises(TypeSafeAPIError) as raised:
         if async_call:
-            asyncio.run(client.system_one_async("document", questions, model=model))
+            asyncio.run(client.system_one_async("state", questions, model=model))
         else:
-            client.system_one("document", questions, model=model)
+            client.system_one("state", questions, model=model)
 
     debug = raised.value.debug
     assert calls == 3
@@ -288,10 +288,10 @@ def test_usage_separates_last_attempt_from_cumulative_totals(async_call):
 
     if async_call:
         response = asyncio.run(
-            client.system_one_async("document", questions, model=model)
+            client.system_one_async("state", questions, model=model)
         )
     else:
-        response = client.system_one("document", questions, model=model)
+        response = client.system_one("state", questions, model=model)
 
     assert calls == 3
     assert response.usage.input_tokens == 100
@@ -354,7 +354,7 @@ def test_invalid_questions_are_rejected(questions):
         OpenSystemOne(
             structured_outputs=True,
             llm_answer_mode="probabilities",
-        ).system_one("document", questions, model=model)
+        ).system_one("state", questions, model=model)
 
 
 @pytest.mark.parametrize(
@@ -399,7 +399,7 @@ def test_malformed_structure_is_retried(
         llm_answer_mode="probabilities",
         n_retry_malformed_structure=1,
     ).system_one(
-        "document",
+        "state",
         questions,
         model=model,
     )

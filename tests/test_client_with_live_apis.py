@@ -37,7 +37,7 @@ from typesafe_sdk import (
 
 from open_system_one import AsyncOpenSystemOne, OpenSystemOne
 
-DOCUMENT = (
+STATE = (
     "The reviewer calls this entirely invented novel about dragons and wizards a "
     "flawless masterpiece and the best book they have ever read. They say it has no "
     "weaknesses, offer only unreserved praise, and urge everyone to read it."
@@ -62,7 +62,7 @@ QUESTIONS = {
         },
     ),
 }
-CONTEXT_PROBE_DOCUMENT = """Catalog facts:
+CONTEXT_PROBE_STATE = """Catalog facts:
 - marker_fen has state DORMANT.
 - marker_tor has state ACTIVE.
 
@@ -188,9 +188,9 @@ def test_live_responses_match_reference_shape(
         questions["rating"]["criteria"] = dict(
             reversed(list(enumerate(QUESTIONS["rating"].criteria)))
         )
-        response = asyncio.run(client.system_one(state=DOCUMENT, questions=questions))
+        response = asyncio.run(client.system_one(state=STATE, questions=questions))
     else:
-        response = client.system_one(DOCUMENT, QUESTIONS, model=model)
+        response = client.system_one(STATE, QUESTIONS, model=model)
     assert_live_response_matches_reference(response, request)
 
     # Shared provider runs protect the SDK's typed views and integer score keys.
@@ -245,14 +245,14 @@ def test_live_models_follow_question_instructions_and_criteria(
     if structured_outputs:
         response = asyncio.run(
             client.system_one_async(
-                CONTEXT_PROBE_DOCUMENT,
+                CONTEXT_PROBE_STATE,
                 CONTEXT_PROBE_QUESTIONS,
                 model=model,
             )
         )
     else:
         response = client.system_one(
-            CONTEXT_PROBE_DOCUMENT,
+            CONTEXT_PROBE_STATE,
             CONTEXT_PROBE_QUESTIONS,
             model=model,
         )
@@ -273,6 +273,6 @@ def test_live_models_follow_question_instructions_and_criteria(
 @pytest.mark.vcr
 def test_live_typesafe_response_matches_reference_shape(request):
     with TypeSafeClient(api_key=os.environ["TYPESAFE_API_KEY"]) as client:
-        response = client.system_one(DOCUMENT, QUESTIONS, model="speed_latest")
+        response = client.system_one(STATE, QUESTIONS, model="speed_latest")
 
     assert_live_response_matches_reference(response, request)

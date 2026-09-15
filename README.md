@@ -27,7 +27,7 @@ open_system_one = OpenSystemOne(
 )
 typesafe_client = TypeSafeClient()
 
-document = "This book was a delight to read."
+state = "This book was a delight to read."
 
 questions = {
     "positive": Noul(instructions="The book review is positive."),
@@ -50,8 +50,8 @@ questions = {
     ),
 }
 
-typesafe_response = typesafe_client.system_one(state=document, questions=questions, model="speed_latest")
-llm_response = open_system_one.system_one(state=document, questions=questions, model="gpt-4o-mini")
+typesafe_response = typesafe_client.system_one(state=state, questions=questions, model="speed_latest")
+llm_response = open_system_one.system_one(state=state, questions=questions, model="gpt-4o-mini")
 
 # llm_response will have a nearly identical shape to typesafe_response
 print(json.dumps(typesafe_response.raw_http_response.json(), indent=2))
@@ -405,7 +405,7 @@ properties when possible.
 - PydanticAI for queries
 - Prompt construction
   - probability and discrete answer modes use distinct system instructions
-  - documents are JSON-serialized inside `<document>` tags; embedded tag characters are escaped and document instructions are never followed
+  - state is JSON-serialized inside `<document>` tags; embedded tag characters are escaped and instructions in the state are never followed
   - probability schemas define Noul truth probability, Choice option probability, and Score rubric-level probability semantics
   - prompted and native structured output use a pinned schema-instruction template owned by this package rather than PydanticAI's mutable default
 - Structured output transport
