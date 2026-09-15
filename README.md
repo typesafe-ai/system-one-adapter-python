@@ -11,7 +11,7 @@ It's main uses cases are
 ```python
 import json
 
-from open_system_one import OpenSystemOne
+from open_system_one import OpenSystemOneClient
 from typesafe_sdk import (
     TypeSafeClient,
     Noul,
@@ -19,8 +19,8 @@ from typesafe_sdk import (
     Choice,
 )
 
-# OpenSystemOne uses the SDK's state/questions interface and LLM model names.
-open_system_one = OpenSystemOne(
+# OpenSystemOneClient uses the SDK's state/questions interface and LLM model names.
+open_system_one_client = OpenSystemOneClient(
     structured_outputs=True,
     llm_answer_mode="probabilities",
     normalize_probabilities=True,
@@ -51,7 +51,7 @@ questions = {
 }
 
 typesafe_response = typesafe_client.system_one(state=state, questions=questions, model="speed_latest")
-llm_response = open_system_one.system_one(state=state, questions=questions, model="gpt-4o-mini")
+llm_response = open_system_one_client.system_one(state=state, questions=questions, model="gpt-4o-mini")
 
 # llm_response will have a nearly identical shape to typesafe_response
 print(json.dumps(typesafe_response.raw_http_response.json(), indent=2))
@@ -59,8 +59,8 @@ print(llm_response.model_dump_json(indent=2))
 ```
 
 Uses `typesafe-sdk>=0.5.7,<0.6`. For async callers, use
-`AsyncOpenSystemOne` with `await client.system_one(state, questions, model=...)`;
-`OpenSystemOne.system_one_async` remains available.
+`AsyncOpenSystemOneClient` with `await client.system_one(state, questions, model=...)`
+and `async with`; `OpenSystemOneClient` provides synchronous calls and `with`.
 
 TypeSafe response:
 
@@ -462,8 +462,8 @@ properties when possible.
   - they do not guarantee future provider payload compatibility; revalidate them against live APIs after provider or SDK changes
   - HTTP failures retain the SDK status-based error class and provider body, including context-window and unparseable-body errors
 - Compatibility scope
-  - `OpenSystemOne` implements SDK evaluation without inheriting the SDK HTTP transport or Models API
-  - supports synchronous `OpenSystemOne.system_one`, asynchronous `AsyncOpenSystemOne.system_one`, context management, `close`, and `aclose`
+  - `OpenSystemOneClient` and `AsyncOpenSystemOneClient` implement SDK evaluation without inheriting the SDK HTTP transport or Models API
+  - supports synchronous `OpenSystemOneClient.system_one` with `close`/`with`, and asynchronous `AsyncOpenSystemOneClient.system_one` with `aclose`/`async with`
   - accepts SDK state and question inputs; responses extend SDK response models with LLM usage and debug data
   - `model` is keyword-only and can also be configured on the client
 - `SystemOneResponse` includes `.model`, `.answers`, `.usage`, `.debug`, and the SDK typed views `.nouls`, `.choices`, and `.scores`.

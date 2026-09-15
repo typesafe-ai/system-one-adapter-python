@@ -17,7 +17,7 @@ from typesafe_sdk import (
     TypeSafeAPIError,
 )
 
-from open_system_one import OpenSystemOne
+from open_system_one import AsyncOpenSystemOneClient, OpenSystemOneClient
 
 STATE = "This is a delightful fiction novel."
 QUESTIONS = {
@@ -68,7 +68,7 @@ def test_native_output_omits_prompted_schema_instructions(
     messages_by_output_mode = {}
     model = create_model_returning_response(response_data)
     for structured_outputs in (False, True):
-        response = OpenSystemOne(
+        response = OpenSystemOneClient(
             structured_outputs=structured_outputs,
             llm_answer_mode=answer_mode,
         ).system_one(
@@ -100,7 +100,7 @@ def test_native_output_omits_prompted_schema_instructions(
 def test_structured_state_prompt_is_delimited_and_escapes_embedded_tags():
     model = create_model_returning_response({"answers": {"answer": 0.75}})
 
-    response = OpenSystemOne(
+    response = OpenSystemOneClient(
         structured_outputs=True,
         llm_answer_mode="probabilities",
     ).system_one(
@@ -135,7 +135,8 @@ def test_transient_errors_are_retried(async_call, retry_on_call):
 
     model = FunctionModel(fail_first_provider_attempt, model_name="test-model")
     retry = RetryPolicy(max_retries=1, backoff_initial=0.001, backoff_jitter=0)
-    client = OpenSystemOne(
+    client_class = AsyncOpenSystemOneClient if async_call else OpenSystemOneClient
+    client = client_class(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         retry=RetryPolicy(max_retries=0) if retry_on_call else retry,
@@ -145,14 +146,10 @@ def test_transient_errors_are_retried(async_call, retry_on_call):
 
     if async_call:
         response = asyncio.run(
-            client.system_one_async(
-                "state", questions, model=model, retry=call_retry
-            )
+            client.system_one("state", questions, model=model, retry=call_retry)
         )
     else:
-        response = client.system_one(
-            "state", questions, model=model, retry=call_retry
-        )
+        response = client.system_one("state", questions, model=model, retry=call_retry)
 
     assert calls == 2
     assert response.usage.n_retries == 1
@@ -187,7 +184,8 @@ def test_retries_are_exhausted(async_call):
 
     model = FunctionModel(raise_retryable_provider_error, model_name="test-model")
     retry = RetryPolicy(max_retries=2, backoff_initial=0.001, backoff_jitter=0)
-    client = OpenSystemOne(
+    client_class = AsyncOpenSystemOneClient if async_call else OpenSystemOneClient
+    client = client_class(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         retry=retry,
@@ -196,7 +194,7 @@ def test_retries_are_exhausted(async_call):
 
     with pytest.raises(TypeSafeAPIError) as raised:
         if async_call:
-            asyncio.run(client.system_one_async("state", questions, model=model))
+            asyncio.run(client.system_one("state", questions, model=model))
         else:
             client.system_one("state", questions, model=model)
 
@@ -224,7 +222,8 @@ def test_malformed_retry_exhaustion_preserves_debug(async_call):
         )
 
     model = FunctionModel(return_malformed_response, model_name="test-model")
-    client = OpenSystemOne(
+    client_class = AsyncOpenSystemOneClient if async_call else OpenSystemOneClient
+    client = client_class(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         n_retry_malformed_structure=2,
@@ -233,7 +232,7 @@ def test_malformed_retry_exhaustion_preserves_debug(async_call):
 
     with pytest.raises(TypeSafeAPIError) as raised:
         if async_call:
-            asyncio.run(client.system_one_async("state", questions, model=model))
+            asyncio.run(client.system_one("state", questions, model=model))
         else:
             client.system_one("state", questions, model=model)
 
@@ -278,7 +277,8 @@ def test_usage_separates_last_attempt_from_cumulative_totals(async_call):
         model_name="test-model",
     )
     retry = RetryPolicy(max_retries=1, backoff_initial=0.001, backoff_jitter=0)
-    client = OpenSystemOne(
+    client_class = AsyncOpenSystemOneClient if async_call else OpenSystemOneClient
+    client = client_class(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         retry=retry,
@@ -287,9 +287,7 @@ def test_usage_separates_last_attempt_from_cumulative_totals(async_call):
     questions = {"answer": QUESTIONS["positive"]}
 
     if async_call:
-        response = asyncio.run(
-            client.system_one_async("state", questions, model=model)
-        )
+        response = asyncio.run(client.system_one("state", questions, model=model))
     else:
         response = client.system_one("state", questions, model=model)
 
@@ -348,7 +346,7 @@ def test_invalid_questions_are_rejected(questions):
     model = create_model_returning_response({"answers": {}})
 
     with pytest.raises(ValueError):
-        OpenSystemOne(
+        OpenSystemOneClient(
             structured_outputs=True,
             llm_answer_mode="probabilities",
         ).system_one("state", questions, model=model)
@@ -391,7 +389,7 @@ def test_malformed_structure_is_retried(
         return_malformed_then_valid_response,
         model_name="test-model",
     )
-    response = OpenSystemOne(
+    response = OpenSystemOneClient(
         structured_outputs=True,
         llm_answer_mode="probabilities",
         n_retry_malformed_structure=1,

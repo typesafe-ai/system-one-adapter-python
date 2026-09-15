@@ -35,7 +35,7 @@ from typesafe_sdk import (
     TypeSafeClient,
 )
 
-from open_system_one import AsyncOpenSystemOne, OpenSystemOne
+from open_system_one import AsyncOpenSystemOneClient, OpenSystemOneClient
 
 STATE = (
     "The reviewer calls this entirely invented novel about dragons and wizards a "
@@ -174,7 +174,9 @@ def test_live_responses_match_reference_shape(
     request,
     vcr,
 ):
-    client_class = AsyncOpenSystemOne if structured_outputs else OpenSystemOne
+    client_class = (
+        AsyncOpenSystemOneClient if structured_outputs else OpenSystemOneClient
+    )
     client = client_class(
         structured_outputs=structured_outputs,
         llm_answer_mode=answer_mode,
@@ -185,9 +187,15 @@ def test_live_responses_match_reference_shape(
         questions = {
             name: msgspec.to_builtins(question) for name, question in QUESTIONS.items()
         }
-        response = asyncio.run(client.system_one(state=STATE, questions=questions))
+
+        async def evaluate_with_async_client():
+            async with client:
+                return await client.system_one(state=STATE, questions=questions)
+
+        response = asyncio.run(evaluate_with_async_client())
     else:
-        response = client.system_one(STATE, QUESTIONS, model=model)
+        with client:
+            response = client.system_one(STATE, QUESTIONS, model=model)
     assert_live_response_matches_reference(response, request)
 
     # Shared provider runs protect the SDK's typed views and integer score keys.
@@ -235,13 +243,16 @@ def test_live_models_follow_question_instructions_and_criteria(
     structured_outputs,
     answer_mode,
 ):
-    client = OpenSystemOne(
+    client_class = (
+        AsyncOpenSystemOneClient if structured_outputs else OpenSystemOneClient
+    )
+    client = client_class(
         structured_outputs=structured_outputs,
         llm_answer_mode=answer_mode,
     )
     if structured_outputs:
         response = asyncio.run(
-            client.system_one_async(
+            client.system_one(
                 CONTEXT_PROBE_STATE,
                 CONTEXT_PROBE_QUESTIONS,
                 model=model,

@@ -79,9 +79,7 @@ _OUTPUT_SCHEMA_INSTRUCTION_TEMPLATE = (
 
 def _serialize_state_as_user_prompt(state: JSONValue) -> str:
     serialized_state = json.dumps(state, ensure_ascii=False, sort_keys=True)
-    serialized_state = serialized_state.replace("<", "\\u003c").replace(
-        ">", "\\u003e"
-    )
+    serialized_state = serialized_state.replace("<", "\\u003c").replace(">", "\\u003e")
     return f"<document>\n{serialized_state}\n</document>"
 
 
@@ -240,8 +238,8 @@ class _EvaluationRun:
         )
 
 
-class OpenSystemOne:
-    """Evaluate TypeSafe questions through any PydanticAI model.
+class _BaseOpenSystemOneClient:
+    """Share configuration and request preparation between sync and async clients.
 
     :param structured_outputs: Use the provider's native structured-output mode.
     :param llm_answer_mode: Request probabilities or discrete answers.
@@ -273,10 +271,16 @@ class OpenSystemOne:
 
     def _evaluation(
         self,
-        model: str | Model,
+        state: str | dict[str, JSONValue] | list[JSONValue],
         questions: Questions,
+        model: str | Model | None,
     ) -> _EvaluationRun:
         """Prepare the questions, output model, and agent for one evaluation."""
+        model = model if model is not None else self.model
+        if model is None:
+            raise ValueError("An LLM model is required on the client or call.")
+        if state is None:
+            raise ValueError("State must not be None.")
         prepared_questions = (
             convert_question_collection_to_validated_api_question_models(questions)
         )
@@ -330,6 +334,10 @@ class OpenSystemOne:
             should_normalize_probabilities=self.normalize_probabilities,
         )
 
+
+class OpenSystemOneClient(_BaseOpenSystemOneClient):
+    """Synchronously evaluate TypeSafe questions through a PydanticAI model."""
+
     def system_one(
         self,
         state: str | dict[str, JSONValue] | list[JSONValue],
@@ -339,12 +347,7 @@ class OpenSystemOne:
         retry: RetryPolicy | None = None,
     ) -> SystemOneResponse:
         """Synchronously evaluate ``questions`` against one ``state``."""
-        model = model if model is not None else self.model
-        if model is None:
-            raise ValueError("An LLM model is required on the client or call.")
-        if state is None:
-            raise ValueError("State must not be None.")
-        evaluation = self._evaluation(model, questions)
+        evaluation = self._evaluation(state, questions, model)
 
         def run_pydantic_agent_attempt() -> Any:
             evaluation.begin_agent_run()
@@ -364,7 +367,28 @@ class OpenSystemOne:
             raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
-    async def system_one_async(
+    def close(self) -> None:
+        """Close the client.
+
+        PydanticAI owns provider connection pools, so no client resource is held here.
+        """
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
+
+
+class AsyncOpenSystemOneClient(_BaseOpenSystemOneClient):
+    """Asynchronously evaluate TypeSafe questions through a PydanticAI model."""
+
+    async def system_one(
         self,
         state: str | dict[str, JSONValue] | list[JSONValue],
         questions: Questions,
@@ -373,12 +397,7 @@ class OpenSystemOne:
         retry: RetryPolicy | None = None,
     ) -> SystemOneResponse:
         """Asynchronously evaluate ``questions`` against one ``state``."""
-        model = model if model is not None else self.model
-        if model is None:
-            raise ValueError("An LLM model is required on the client or call.")
-        if state is None:
-            raise ValueError("State must not be None.")
-        evaluation = self._evaluation(model, questions)
+        evaluation = self._evaluation(state, questions, model)
 
         def run_pydantic_agent_attempt_async() -> Any:
             evaluation.begin_agent_run()
@@ -398,25 +417,8 @@ class OpenSystemOne:
             raise
         return evaluation.response(cast(BaseModel, result.output), n_retries)
 
-    def close(self) -> None:
-        """Close the client.
-
-        PydanticAI owns provider connection pools, so no client resource is held here.
-        """
-
     async def aclose(self) -> None:
-        """Asynchronously close the client."""
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
+        """Close the client; PydanticAI owns the provider connection pools."""
 
     async def __aenter__(self) -> Self:
         return self
@@ -428,17 +430,3 @@ class OpenSystemOne:
         traceback: TracebackType | None,
     ) -> None:
         await self.aclose()
-
-
-class AsyncOpenSystemOne(OpenSystemOne):
-    """Asynchronous counterpart with the SDK's awaitable ``system_one`` interface."""
-
-    async def system_one(
-        self,
-        state: str | dict[str, JSONValue] | list[JSONValue],
-        questions: Questions,
-        *,
-        model: str | Model | None = None,
-        retry: RetryPolicy | None = None,
-    ) -> SystemOneResponse:
-        return await self.system_one_async(state, questions, model=model, retry=retry)

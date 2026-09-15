@@ -25,7 +25,7 @@ from typesafe_sdk import (
     TypeSafeRateLimitError,
 )
 
-from open_system_one import OpenSystemOne
+from open_system_one import OpenSystemOneClient
 from open_system_one.utils.error_handling import run_with_retries
 
 QUESTION = Noul(instructions="The review is positive.")
@@ -143,7 +143,7 @@ def test_provider_errors(make_error, error_type, expected_status_code):
     model = FunctionModel(raise_configured_provider_error, model_name="test-model")
 
     with pytest.raises(error_type) as raised:
-        OpenSystemOne(
+        OpenSystemOneClient(
             structured_outputs=True,
             llm_answer_mode="probabilities",
         ).system_one("state", {"answer": QUESTION}, model=model)
@@ -317,7 +317,7 @@ def test_provider_http_errors_preserve_status_and_body(
     model = mock_provider_model(provider, return_provider_error)
 
     with pytest.raises(expected_error) as raised:
-        OpenSystemOne(
+        OpenSystemOneClient(
             structured_outputs=True,
             llm_answer_mode="probabilities",
         ).system_one("state", {"answer": QUESTION}, model=model)
