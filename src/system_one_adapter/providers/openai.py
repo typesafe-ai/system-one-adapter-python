@@ -106,6 +106,10 @@ class OpenAIProvider(_OpenAIErrors):
         self._client = openai.OpenAI(base_url=base_url, api_key=api_key, max_retries=0)
         self.api = api if api is not None else ("responses" if self._client.base_url.host == "api.openai.com" else "chat_completions")
 
+    def close(self) -> None:
+        """Release the SDK client's connection pool."""
+        self._client.close()
+
     def request(
         self,
         messages: list[Message],
@@ -148,6 +152,10 @@ class AsyncOpenAIProvider(_OpenAIErrors):
         self.model_name = model_name
         self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key, max_retries=0)
         self.api = api if api is not None else ("responses" if self._client.base_url.host == "api.openai.com" else "chat_completions")
+
+    async def aclose(self) -> None:
+        """Release the SDK client's connection pool."""
+        await self._client.close()
 
     async def request(
         self,

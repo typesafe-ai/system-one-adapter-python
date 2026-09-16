@@ -12,7 +12,13 @@ import anthropic
 from typesafe_sdk import TypeSafeError
 
 from system_one_adapter._utils.error_handling import map_provider_error
-from system_one_adapter.providers.base import Message, ProviderResult, record_request, record_response, translating
+from system_one_adapter.providers.base import (
+    Message,
+    ProviderResult,
+    record_request,
+    record_response,
+    translating,
+)
 
 _DEFAULT_MAX_TOKENS = 4096
 
@@ -78,6 +84,10 @@ class AnthropicProvider(_AnthropicErrors):
         self.max_tokens = max_tokens
         self._client = anthropic.Anthropic(max_retries=0)
 
+    def close(self) -> None:
+        """Release the SDK client's connection pool."""
+        self._client.close()
+
     def request(
         self,
         messages: list[Message],
@@ -103,6 +113,10 @@ class AsyncAnthropicProvider(_AnthropicErrors):
         self.model_name = model_name
         self.max_tokens = max_tokens
         self._client = anthropic.AsyncAnthropic(max_retries=0)
+
+    async def aclose(self) -> None:
+        """Release the SDK client's connection pool."""
+        await self._client.close()
 
     async def request(
         self,

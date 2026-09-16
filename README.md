@@ -112,6 +112,38 @@ print(msgspec.json.encode(response).decode())
 `AsyncSystemOneAdapterClient` mirrors the sync client with `await client.system_one(...)`
 and `async with`.
 
+### Provider reuse and cleanup
+
+When `model` is a string, the adapter creates a provider on first use and reuses it
+for subsequent calls with the same resolved `provider` and `model`. Each adapter
+has its own providers and connection pools. Use `with` / `async with`, or call
+`close()` / `await aclose()`, to release those pools:
+
+```python
+with SystemOneAdapterClient(
+    structured_outputs=True,
+    llm_answer_mode="probabilities",
+    provider="openai",
+    model="gpt-4o-mini",
+) as client:
+    first = client.system_one("A delightful book.", questions)
+    second = client.system_one("A disappointing book.", questions)
+```
+
+Providers passed as instances, whether on the constructor or a call, remain
+caller-owned. The adapter never closes them. Close built-in provider instances
+with `provider.close()` or `await provider.aclose()` after their last use. Custom
+providers do not need to implement cleanup methods.
+
+Finish all evaluations before closing the adapter; shutdown does not wait for
+in-flight requests. Keep an async adapter and its owned providers within one event
+loop. Shutdown is idempotent and attempts every owned provider's cleanup even if
+one fails, then raises the cleanup error. A closed adapter cannot be reused or
+reentered.
+
+Environment-derived credentials and endpoints are captured when each provider is
+first created. Create a new adapter to pick up changed environment configuration.
+
 ## Options
 
 | Option | Meaning |

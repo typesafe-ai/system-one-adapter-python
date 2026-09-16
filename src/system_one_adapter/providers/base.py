@@ -100,6 +100,20 @@ class AsyncProvider(Protocol):
         ...
 
 
+@runtime_checkable
+class SupportsClose(Protocol):
+    """Optional lifecycle capability, separate from the request protocol."""
+
+    def close(self) -> None: ...
+
+
+@runtime_checkable
+class SupportsAsyncClose(Protocol):
+    """Optional async lifecycle capability, separate from the request protocol."""
+
+    async def aclose(self) -> None: ...
+
+
 def render_messages(messages: list[Message]) -> list[dict[str, str]]:
     """Render messages into the role/content dictionaries the chat APIs expect."""
     return [{"role": m.role, "content": m.content} for m in messages]
